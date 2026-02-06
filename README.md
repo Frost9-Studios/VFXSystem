@@ -39,5 +39,12 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
 ## Current Status
 - Layer 0 complete: package scaffolding and assembly setup.
 - Layer 1 complete: core runtime, pooling, handle safety, baseline tests.
+- Layer 1 gate tests now include:
+  - stale-handle safety after recycle
+  - default `StopAll()` gameplay-only scope behavior
+  - hard-cap enforcement when pool expansion is disabled
+  - reset-on-reuse position correctness
+  - fallback auto-release for non-completing runners
+  - active-count cleanup when pooled instances are externally destroyed
 - Layer 2 pending: attach/update specialization and line/arc runner.
 - Layer 3 pending: editor validation, ref-generation tooling, diagnostics.
