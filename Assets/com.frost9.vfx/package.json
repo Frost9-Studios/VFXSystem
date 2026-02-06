@@ -1,0 +1,21 @@
+{
+  "name": "com.frost9.vfx",
+  "displayName": "Frost9 VFX System",
+  "version": "0.1.0",
+  "description": "Reusable visual effects system with catalog-driven playback, pooling, and optional DI integration.",
+  "unity": "6000.0",
+  "keywords": [
+    "vfx",
+    "effects",
+    "pooling",
+    "unity"
+  ],
+  "author": {
+    "name": "Frost9",
+    "email": "contact@frost9.com",
+    "url": "https://frost9.com"
+  },
+  "type": "library",
+  "dependencies": {},
+  "samples": []
+}

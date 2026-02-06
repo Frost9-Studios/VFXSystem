@@ -1,4 +1,14 @@
 ﻿<Solution>
+  <Project Path="FullscreenEditor.csproj" />
+  <Project Path="Frost9.Audio.csproj" />
+  <Project Path="Frost9.VFX.csproj" />
+  <Project Path="FMODUnityResonanceEditor.csproj" />
+  <Project Path="Frost9.Audio.Editor.csproj" />
+  <Project Path="FMODUnityEditor.csproj" />
+  <Project Path="FMODUnity.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="FMODUnityResonance.csproj" />
+  <Project Path="Frost9.Audio.Generated.csproj" />
+  <Project Path="Frost9.VFX.Tests.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
 </Solution>

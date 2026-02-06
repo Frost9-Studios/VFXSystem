@@ -1,0 +1,20 @@
+{
+    "name": "Frost9.VFX",
+    "rootNamespace": "Frost9.VFX",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "jp.hadashikick.vcontainer",
+            "expression": "",
+            "define": "VCONTAINER_AVAILABLE"
+        }
+    ],
+    "noEngineReferences": false
+}

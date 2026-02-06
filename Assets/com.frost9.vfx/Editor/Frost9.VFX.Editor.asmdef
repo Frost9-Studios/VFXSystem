@@ -1,0 +1,18 @@
+{
+    "name": "Frost9.VFX.Editor",
+    "rootNamespace": "Frost9.VFX.Editor",
+    "references": [
+        "Frost9.VFX"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
