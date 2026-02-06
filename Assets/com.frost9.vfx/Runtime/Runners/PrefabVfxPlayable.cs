@@ -213,24 +213,6 @@ namespace Frost9.VFX
         private void ConfigureTransform(in VfxSpawnArgs args)
         {
             var targetRotation = IsDefaultQuaternion(args.Rotation) ? Quaternion.identity : args.Rotation;
-            var parent = args.Parent;
-
-            if (args.AttachMode == AttachMode.AttachToTransform && parent != null)
-            {
-                transform.SetParent(parent, false);
-                transform.localPosition = Vector3.zero;
-                transform.localRotation = Quaternion.identity;
-                return;
-            }
-
-            if (args.AttachMode == AttachMode.FollowPositionOnly && parent != null)
-            {
-                transform.SetParent(parent, true);
-                transform.position = parent.position;
-                transform.rotation = targetRotation;
-                return;
-            }
-
             transform.SetParent(null, true);
             transform.position = args.Position;
             transform.rotation = targetRotation;

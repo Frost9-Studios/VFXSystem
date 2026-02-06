@@ -337,7 +337,7 @@ namespace Project.VfxSandbox
             lastHandle = vfxService.PlayOn(
                 VFXRefs.Effects.VfxPrefab,
                 attachTarget.gameObject,
-                AttachMode.AttachToTransform,
+                AttachMode.FollowTransform,
                 parameters);
         }
 

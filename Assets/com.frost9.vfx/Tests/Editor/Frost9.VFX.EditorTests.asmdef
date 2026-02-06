@@ -1,0 +1,26 @@
+{
+    "name": "Frost9.VFX.EditorTests",
+    "rootNamespace": "Frost9.VFX.Tests",
+    "references": [
+        "Frost9.VFX",
+        "Frost9.VFX.Editor"
+    ],
+    "optionalUnityReferences": [
+        "TestAssemblies"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

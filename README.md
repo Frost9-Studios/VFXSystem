@@ -23,11 +23,33 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - `GetStats()`
 - `VfxManager` static facade for non-DI usage.
 
+## Layer 2 Runtime Behavior
+- `PlayOn(...)` supports:
+  - `AttachMode.FollowTransform`
+  - `AttachMode.FollowPositionOnly`
+  - `AttachMode.WorldLocked`
+- `PlayOn(...)` returns invalid handle for null/destroyed targets (warn-once).
+- Attached instances auto-release safely when target objects are destroyed.
+- `VfxPlayOptions.WithIgnoreTargetScale(bool)` is available for attached playback behavior.
+- `VfxParams.TargetPoint` is treated as world-space.
+- Built-in straight-line preview runner: `LineArcVfxPlayable` (LineRenderer-based).
+
 ## Data Model
 - `VfxId` identifiers.
 - `VfxCatalog` / `VfxCatalogEntry` as source of truth.
 - `VfxParams` typed parameter struct.
 - `VFXRefs` generated-style ids under `Runtime/Generated/`.
+
+## Editor Tooling
+- Catalog validation:
+  - inspector button on `VfxCatalog` assets
+  - menu item: `Tools/Frost9/VFX/Validate All Catalogs`
+  - throttled auto-validation on catalog asset changes
+- Deterministic refs generation:
+  - menu item: `Tools/Frost9/VFX/Generate VFXRefs`
+  - generator sorts by `VfxId` string
+  - deterministic identifier sanitization + collision suffixing
+  - safe write behavior (temp replace and no-op when content unchanged)
 
 ## Pooling and Safety
 - Per-id pooling via `VfxPoolManager`.
@@ -46,5 +68,25 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - reset-on-reuse position correctness
   - fallback auto-release for non-completing runners
   - active-count cleanup when pooled instances are externally destroyed
-- Layer 2 pending: attach/update specialization and line/arc runner.
-- Layer 3 pending: editor validation, ref-generation tooling, diagnostics.
+- Layer 2 complete: attach lifecycle, handle update gates, and line runner.
+- Layer 2 gate tests include:
+  - null/destroyed target safe-failure for `PlayOn(...)`
+  - `FollowPositionOnly` movement behavior
+  - target-destroy auto-release for attached effects
+  - valid/stale handle behavior for `TryUpdate(...)`
+  - line-runner play/update/stop/pool-reuse coverage
+- Layer 3A complete: editor validation foundation.
+- Layer 3A includes:
+  - `VfxCatalogValidator` with structured error/warning output
+  - manual validation via catalog inspector button and `Tools/Frost9/VFX/Validate All Catalogs`
+  - throttled automatic validation on catalog asset changes
+  - validation coverage for duplicate ids, missing prefabs, missing `IVfxPlayable`, and pool/lifetime config sanity
+  - editor tests for valid and deliberately broken catalog cases
+- Layer 3B complete: deterministic `VFXRefs` generation tooling.
+- Layer 3B includes:
+  - deterministic source generation from catalog ids
+  - stable sort by `VfxId` string (not asset path)
+  - deterministic sanitization and collision handling (`_2`, `_3`, ...)
+  - safe write with unchanged-content short-circuit
+  - editor tests for ordering, sanitization/collision, and unchanged second-run behavior
+- Layer 3C pending: diagnostics window.

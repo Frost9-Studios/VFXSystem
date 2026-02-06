@@ -74,7 +74,7 @@ namespace Frost9.VFX
             ThrowIfDisposed();
             if (target == null)
             {
-                WarnOnceLogger.Log("vfx_target_null", "[VfxService] PlayOn called with null target.");
+                WarnOnceLogger.Log("vfx_target_null", "[VfxService] PlayOn called with null or destroyed target.");
                 return VfxHandle.Invalid;
             }
 

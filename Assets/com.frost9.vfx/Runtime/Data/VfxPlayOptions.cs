@@ -21,6 +21,9 @@ namespace Frost9.VFX
         [SerializeField]
         private bool autoRelease;
 
+        [SerializeField]
+        private bool ignoreTargetScale;
+
         /// <summary>
         /// Gets default options targeting gameplay channel.
         /// </summary>
@@ -48,6 +51,11 @@ namespace Frost9.VFX
         /// Gets explicit auto-release value.
         /// </summary>
         public bool AutoRelease => autoRelease;
+
+        /// <summary>
+        /// Gets whether target scale should be ignored for attached effects.
+        /// </summary>
+        public bool IgnoreTargetScale => ignoreTargetScale;
 
         /// <summary>
         /// Returns a copy with channel assignment.
@@ -80,6 +88,17 @@ namespace Frost9.VFX
         {
             hasAutoReleaseOverride = true;
             autoRelease = value;
+            return this;
+        }
+
+        /// <summary>
+        /// Returns a copy with target-scale follow behavior.
+        /// </summary>
+        /// <param name="value">True to ignore target scale for attached effects.</param>
+        /// <returns>Updated options.</returns>
+        public VfxPlayOptions WithIgnoreTargetScale(bool value)
+        {
+            ignoreTargetScale = value;
             return this;
         }
     }

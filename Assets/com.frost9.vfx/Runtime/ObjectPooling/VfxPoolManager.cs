@@ -35,6 +35,10 @@ namespace Frost9.VFX
             public bool IsReleasing;
             public bool HasAutoReleaseDeadline;
             public float AutoReleaseAtTime;
+            public AttachMode AttachMode;
+            public Transform AttachTarget;
+            public bool IgnoreTargetScale;
+            public Vector3 AttachedBaseLocalScale;
         }
 
         private readonly Dictionary<VfxId, VfxPoolBucket> buckets = new Dictionary<VfxId, VfxPoolBucket>();
@@ -42,6 +46,7 @@ namespace Frost9.VFX
         private readonly Dictionary<IVfxPlayable, PooledVfxInstance> instancesByPlayable = new Dictionary<IVfxPlayable, PooledVfxInstance>();
         private readonly List<PooledVfxInstance> pendingTimedRelease = new List<PooledVfxInstance>();
         private readonly List<PooledVfxInstance> pendingDestroyedCleanup = new List<PooledVfxInstance>();
+        private readonly List<PooledVfxInstance> pendingTargetLostRelease = new List<PooledVfxInstance>();
 
         private VfxCatalog catalog;
         private VfxSystemConfiguration configuration;
@@ -101,6 +106,14 @@ namespace Frost9.VFX
                 return false;
             }
 
+            if (args.AttachMode != AttachMode.WorldLocked && args.Parent == null)
+            {
+                WarnOnceLogger.Log(
+                    $"vfx_missing_target_{args.Id}",
+                    $"[VfxPoolManager] Attach mode '{args.AttachMode}' requires a valid target transform for {args.Id}.");
+                return false;
+            }
+
             if (activeCount >= configuration.MaxActiveInstances)
             {
                 WarnOnceLogger.Log(
@@ -139,6 +152,10 @@ namespace Frost9.VFX
             instance.IsReleasing = false;
             instance.HasAutoReleaseDeadline = false;
             instance.AutoReleaseAtTime = 0f;
+            instance.AttachMode = NormalizeAttachMode(args.AttachMode);
+            instance.AttachTarget = instance.AttachMode == AttachMode.WorldLocked ? null : args.Parent;
+            instance.IgnoreTargetScale = args.Options.IgnoreTargetScale;
+            instance.AttachedBaseLocalScale = Vector3.one;
 
             var autoReleaseLifetime = ResolveAutoReleaseLifetime(args);
             if (instance.AutoRelease && autoReleaseLifetime > 0f)
@@ -152,6 +169,14 @@ namespace Frost9.VFX
 
             instance.GameObject.SetActive(true);
             instance.Playable.Reset(args);
+            instance.AttachedBaseLocalScale = instance.GameObject.transform.localScale;
+
+            if (!TryApplyAttachment(instance))
+            {
+                ReleaseInstance(instance, VfxStopMode.StopEmittingAndClear, callStop: true);
+                return false;
+            }
+
             instance.Playable.Play();
 
             handle = new VfxHandle(instance.SlotIndex, instance.Generation);
@@ -225,6 +250,13 @@ namespace Frost9.VFX
             }
 
             instance.Playable.Apply(parameters);
+            instance.AttachedBaseLocalScale = instance.GameObject.transform.localScale;
+            if (!TryApplyAttachment(instance))
+            {
+                ReleaseInstance(instance, VfxStopMode.StopEmittingAndClear, callStop: true);
+                return false;
+            }
+
             return true;
         }
 
@@ -392,6 +424,10 @@ namespace Frost9.VFX
             instance.IsActive = false;
             instance.HasAutoReleaseDeadline = false;
             instance.AutoReleaseAtTime = 0f;
+            instance.AttachMode = AttachMode.WorldLocked;
+            instance.AttachTarget = null;
+            instance.IgnoreTargetScale = false;
+            instance.AttachedBaseLocalScale = Vector3.one;
         }
 
         private void OnDestroyPoolObject(PooledVfxInstance instance)
@@ -489,6 +525,7 @@ namespace Frost9.VFX
 
             pendingTimedRelease.Clear();
             pendingDestroyedCleanup.Clear();
+            pendingTargetLostRelease.Clear();
 
             foreach (var pair in instancesBySlot)
             {
@@ -504,6 +541,15 @@ namespace Frost9.VFX
                     continue;
                 }
 
+                if (instance.AttachMode != AttachMode.WorldLocked)
+                {
+                    if (!TryApplyAttachment(instance))
+                    {
+                        pendingTargetLostRelease.Add(instance);
+                        continue;
+                    }
+                }
+
                 if (instance.AutoRelease &&
                     instance.HasAutoReleaseDeadline &&
                     Time.time >= instance.AutoReleaseAtTime)
@@ -515,6 +561,11 @@ namespace Frost9.VFX
             for (var i = 0; i < pendingTimedRelease.Count; i++)
             {
                 ReleaseInstance(pendingTimedRelease[i], VfxStopMode.StopEmittingAndClear, callStop: true);
+            }
+
+            for (var i = 0; i < pendingTargetLostRelease.Count; i++)
+            {
+                ReleaseInstance(pendingTargetLostRelease[i], VfxStopMode.StopEmittingAndClear, callStop: true);
             }
 
             for (var i = 0; i < pendingDestroyedCleanup.Count; i++)
@@ -535,6 +586,10 @@ namespace Frost9.VFX
             instance.HasAutoReleaseDeadline = false;
             instance.AutoReleaseAtTime = 0f;
             instance.Owner = null;
+            instance.AttachMode = AttachMode.WorldLocked;
+            instance.AttachTarget = null;
+            instance.IgnoreTargetScale = false;
+            instance.AttachedBaseLocalScale = Vector3.one;
 
             instance.Bucket?.ActiveInstances.Remove(instance);
             activeCount = Mathf.Max(0, activeCount - 1);
@@ -546,6 +601,57 @@ namespace Frost9.VFX
             }
 
             instancesBySlot.Remove(instance.SlotIndex);
+        }
+
+        private static AttachMode NormalizeAttachMode(AttachMode mode)
+        {
+#pragma warning disable CS0618
+            return mode == AttachMode.AttachToTransform ? AttachMode.FollowTransform : mode;
+#pragma warning restore CS0618
+        }
+
+        private static bool TryApplyAttachment(PooledVfxInstance instance)
+        {
+            if (instance == null || instance.GameObject == null)
+            {
+                return false;
+            }
+
+            if (instance.AttachMode == AttachMode.WorldLocked)
+            {
+                return true;
+            }
+
+            var target = instance.AttachTarget;
+            if (target == null)
+            {
+                return false;
+            }
+
+            var instanceTransform = instance.GameObject.transform;
+            switch (instance.AttachMode)
+            {
+                case AttachMode.FollowTransform:
+                    instanceTransform.position = target.position;
+                    instanceTransform.rotation = target.rotation;
+                    if (instance.IgnoreTargetScale)
+                    {
+                        instanceTransform.localScale = instance.AttachedBaseLocalScale;
+                    }
+                    else
+                    {
+                        instanceTransform.localScale = Vector3.Scale(instance.AttachedBaseLocalScale, target.lossyScale);
+                    }
+
+                    return true;
+
+                case AttachMode.FollowPositionOnly:
+                    instanceTransform.position = target.position;
+                    return true;
+
+                default:
+                    return true;
+            }
         }
 
         private static float ResolveAutoReleaseLifetime(in VfxSpawnArgs args)

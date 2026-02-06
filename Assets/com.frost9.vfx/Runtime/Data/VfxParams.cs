@@ -85,7 +85,7 @@ namespace Frost9.VFX
         public bool HasTargetPoint => hasTargetPoint;
 
         /// <summary>
-        /// Gets configured target point.
+        /// Gets configured world-space target point.
         /// </summary>
         public Vector3 TargetPoint => targetPoint;
 
@@ -138,9 +138,9 @@ namespace Frost9.VFX
         }
 
         /// <summary>
-        /// Returns a copy with target point override.
+        /// Returns a copy with world-space target point override.
         /// </summary>
-        /// <param name="value">Target position.</param>
+        /// <param name="value">World-space target position.</param>
         /// <returns>Updated parameters.</returns>
         public VfxParams WithTargetPoint(Vector3 value)
         {
