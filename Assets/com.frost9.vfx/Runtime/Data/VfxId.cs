@@ -10,6 +10,7 @@ namespace Frost9.VFX
     public struct VfxId : IEquatable<VfxId>
     {
         [SerializeField]
+        [Tooltip("String id value used to match catalog entries. Example: Effects.FireballImpact")]
         private string value;
 
         /// <summary>

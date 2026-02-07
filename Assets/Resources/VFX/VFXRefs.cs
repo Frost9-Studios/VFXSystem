@@ -6,14 +6,14 @@ namespace Frost9.VFX
     public static class VFXRefs
     {
         /// <summary>
-        /// Effect identifier group.
+        /// Identifier group: Effects.
         /// </summary>
         public static class Effects
         {
             /// <summary>
-            /// Generic VFX prefab identifier.
+            /// VFX id: Effects.Explosion.
             /// </summary>
-            public static readonly VfxId VfxPrefab = new VfxId("Effects.VfxPrefab");
+            public static readonly VfxId Explosion = new VfxId("Effects.Explosion");
         }
     }
 }

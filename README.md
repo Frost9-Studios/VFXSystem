@@ -88,7 +88,8 @@ var stopped = vfxService.StopAll(
 - `VfxId` identifiers.
 - `VfxCatalog` / `VfxCatalogEntry` as source of truth.
 - `VfxParams` typed parameter struct.
-- `VFXRefs` generated-style ids under `Runtime/Generated/`.
+- `VFXRefs` generated-style ids at `Assets/Resources/VFX/VFXRefs.cs` (outside package).
+- `VfxCatalogEntry.Id` is a string id (for example `Effects.FireballImpact`), not a numeric id.
 
 ## Editor Tooling
 - Catalog validation:
@@ -97,6 +98,9 @@ var stopped = vfxService.StopAll(
   - throttled auto-validation on catalog asset changes
 - Deterministic refs generation:
   - menu item: `Tools/Frost9/VFX/Generate VFXRefs`
+  - scans all project `VfxCatalog` assets via `AssetDatabase.FindAssets("t:VfxCatalog")`
+  - fixed output path: `Assets/Resources/VFX/VFXRefs.cs`
+  - output folder is auto-created when missing
   - generator sorts by `VfxId` string
   - deterministic identifier sanitization + collision suffixing
 - safe write behavior (temp replace and no-op when content unchanged)

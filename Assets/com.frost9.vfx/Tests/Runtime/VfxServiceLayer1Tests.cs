@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -11,6 +11,8 @@ namespace Frost9.VFX.Tests
     /// </summary>
     public class VfxServiceLayer1Tests
     {
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
+
         private VfxService service;
         private GameObject poolManagerObject;
         private GameObject prefab;
@@ -32,7 +34,7 @@ namespace Frost9.VFX.Tests
             catalog = ScriptableObject.CreateInstance<VfxCatalog>();
             catalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, prefab)
+                new VfxCatalogEntry(DefaultVfxId, prefab)
             });
 
             configuration = ScriptableObject.CreateInstance<VfxSystemConfiguration>();
@@ -79,7 +81,7 @@ namespace Frost9.VFX.Tests
         public void PlayAt_ReturnsValidHandle_ForKnownCatalogId()
         {
             var handle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(0.25f));
@@ -95,7 +97,7 @@ namespace Frost9.VFX.Tests
         public IEnumerator Stop_IgnoresStaleHandle_AfterRecycle()
         {
             var firstHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(0.01f));
@@ -106,7 +108,7 @@ namespace Frost9.VFX.Tests
             Assert.AreEqual(0, service.GetStats().TotalActiveInstances);
 
             var secondHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.one,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(1f));
@@ -130,13 +132,13 @@ namespace Frost9.VFX.Tests
         public void StopAll_DefaultScope_IsGameplayOnly()
         {
             var gameplayHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(2f));
 
             var uiHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.right,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(2f),
@@ -179,13 +181,13 @@ namespace Frost9.VFX.Tests
                 maxActive: 32);
 
             var firstHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(2f));
 
             var secondHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.right,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(2f));
@@ -218,7 +220,7 @@ namespace Frost9.VFX.Tests
             var positionB = new Vector3(-3f, 0f, 2f);
 
             var firstHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 positionA,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(0.05f));
@@ -231,7 +233,7 @@ namespace Frost9.VFX.Tests
             Assert.IsNotNull(pooledInstance, "Expected at least one pooled PrefabVfxPlayable instance.");
 
             var secondHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 positionB,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(1f));
@@ -292,7 +294,7 @@ namespace Frost9.VFX.Tests
             bool autoReleaseByDefault,
             float fallbackLifetimeSeconds)
         {
-            var entry = new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, entryPrefab);
+            var entry = new VfxCatalogEntry(DefaultVfxId, entryPrefab);
             SetPrivateField(entry, "initialPoolSize", initialPoolSize);
             SetPrivateField(entry, "maxPoolSize", maxPoolSize);
             SetPrivateField(entry, "allowPoolExpansion", allowPoolExpansion);
@@ -324,3 +326,4 @@ namespace Frost9.VFX.Tests
         }
     }
 }
+

@@ -96,7 +96,7 @@ namespace Frost9.VFX.Tests
 
             Assert.IsTrue(first.Changed);
             Assert.IsFalse(second.Changed);
-            Assert.AreEqual(2, second.IdCount);
+            Assert.GreaterOrEqual(second.IdCount, 2);
             Assert.AreEqual(TempOutputPath, second.OutputPath);
             Assert.IsTrue(AssetDatabase.LoadAssetAtPath<MonoScript>(TempOutputPath) != null);
         }

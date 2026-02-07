@@ -10,33 +10,42 @@ namespace Frost9.VFX
     public class VfxCatalogEntry
     {
         [SerializeField]
+        [Tooltip("Stable string identifier (VfxId). Example: Effects.FireballImpact.")]
         private VfxId id;
 
         [SerializeField]
+        [Tooltip("Prefab that contains an IVfxPlayable-compatible runner (for example PrefabVfxPlayable or LineArcVfxPlayable).")]
         private GameObject prefab;
 
         [SerializeField]
         [Min(0)]
+        [Tooltip("Number of instances prewarmed into this entry's pool at startup.")]
         private int initialPoolSize = 4;
 
         [SerializeField]
         [Min(1)]
+        [Tooltip("Hard cap for pooled instances allocated for this entry.")]
         private int maxPoolSize = 32;
 
         [SerializeField]
+        [Tooltip("When enabled, pool may grow beyond initial size up to max pool size.")]
         private bool allowPoolExpansion = true;
 
         [SerializeField]
+        [Tooltip("Default playback channel used when play options do not override channel.")]
         private VfxChannel defaultChannel = VfxChannel.Gameplay;
 
         [SerializeField]
+        [Tooltip("When enabled, spawned instances auto-release when playback completes.")]
         private bool autoReleaseByDefault = true;
 
         [SerializeField]
         [Min(0f)]
+        [Tooltip("Fallback auto-release lifetime (seconds) when no completion signal is reported by runner.")]
         private float fallbackLifetimeSeconds = 1.25f;
 
         [SerializeField]
+        [Tooltip("Default typed parameters merged with call-site overrides at play time.")]
         private VfxParams defaultParameters;
 
         /// <summary>

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using Frost9.VFX;
 using Frost9.VFX.Integration.VContainer;
 using UnityEngine;
@@ -107,6 +107,7 @@ namespace Project.VfxSandbox
         [Tooltip("Interval for periodic stats logs in seconds.")]
         private float statsLogIntervalSeconds = 2f;
 
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
         private static readonly VfxId LinePreviewId = new VfxId("Effects.LinePreview");
 
         private IVfxService vfxService;
@@ -321,7 +322,7 @@ namespace Project.VfxSandbox
             runtimeCatalog = ScriptableObject.CreateInstance<VfxCatalog>();
             runtimeCatalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, vfxPrefab),
+                new VfxCatalogEntry(DefaultVfxId, vfxPrefab),
                 new VfxCatalogEntry(LinePreviewId, linePreviewPrefab)
             });
 
@@ -495,7 +496,7 @@ namespace Project.VfxSandbox
         private void SpawnAtPoint(Vector3 point)
         {
             var parameters = VfxParams.Empty.WithLifetimeOverride(defaultLifetimeSeconds);
-            lastPrefabHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, point, Quaternion.identity, parameters);
+            lastPrefabHandle = vfxService.PlayAt(DefaultVfxId, point, Quaternion.identity, parameters);
             SetActionMessage($"Spawn prefab at {point} -> {lastPrefabHandle.IsValid}");
         }
 
@@ -512,7 +513,7 @@ namespace Project.VfxSandbox
                     .WithLifetimeOverride(Random.Range(0.6f, 1.8f))
                     .WithScale(Random.Range(0.75f, 1.45f));
 
-                lastPrefabHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, position, Quaternion.identity, parameters);
+                lastPrefabHandle = vfxService.PlayAt(DefaultVfxId, position, Quaternion.identity, parameters);
             }
 
             SetActionMessage($"Burst spawned: {spamCount} effects.");
@@ -534,7 +535,7 @@ namespace Project.VfxSandbox
                 .WithIgnoreTargetScale(ignoreTargetScaleOnAttach);
 
             lastPrefabHandle = vfxService.PlayOn(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 attachTarget.gameObject,
                 attachMode,
                 parameters,
@@ -552,7 +553,7 @@ namespace Project.VfxSandbox
                 .WithChannel(VfxChannel.UI)
                 .WithAutoRelease(false);
 
-            lastUiHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, position, Quaternion.identity, parameters, options);
+            lastUiHandle = vfxService.PlayAt(DefaultVfxId, position, Quaternion.identity, parameters, options);
             SetActionMessage($"Spawn UI-channel effect -> {lastUiHandle.IsValid}");
         }
 
@@ -752,7 +753,7 @@ namespace Project.VfxSandbox
             try
             {
                 var shortHandle = vfxService.PlayAt(
-                    VFXRefs.Effects.VfxPrefab,
+                    DefaultVfxId,
                     Vector3.left * 2f,
                     Quaternion.identity,
                     VfxParams.Empty.WithLifetimeOverride(0.05f));
@@ -760,7 +761,7 @@ namespace Project.VfxSandbox
                 yield return new WaitForSeconds(0.2f);
 
                 var longHandle = vfxService.PlayAt(
-                    VFXRefs.Effects.VfxPrefab,
+                    DefaultVfxId,
                     Vector3.right * 2f,
                     Quaternion.identity,
                     VfxParams.Empty.WithLifetimeOverride(2f));
@@ -811,7 +812,7 @@ namespace Project.VfxSandbox
                 var angle = i * Mathf.PI * 2f / verificationBurstCount;
                 var offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 2f;
                 var parameters = VfxParams.Empty.WithLifetimeOverride(verificationLifetimeSeconds);
-                vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, center + offset, Quaternion.identity, parameters);
+                vfxService.PlayAt(DefaultVfxId, center + offset, Quaternion.identity, parameters);
             }
         }
 
@@ -839,3 +840,4 @@ namespace Project.VfxSandbox
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -10,6 +10,8 @@ namespace Frost9.VFX.Tests
     /// </summary>
     public class VfxServiceLayer2AttachTests
     {
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
+
         private VfxService service;
         private GameObject poolManagerObject;
         private GameObject prefab;
@@ -31,7 +33,7 @@ namespace Frost9.VFX.Tests
             catalog = ScriptableObject.CreateInstance<VfxCatalog>();
             catalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, prefab)
+                new VfxCatalogEntry(DefaultVfxId, prefab)
             });
 
             configuration = ScriptableObject.CreateInstance<VfxSystemConfiguration>();
@@ -84,7 +86,7 @@ namespace Frost9.VFX.Tests
         public void PlayOn_NullOrDestroyedTarget_ReturnsInvalidHandle()
         {
             var nullTargetHandle = service.PlayOn(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 null,
                 AttachMode.FollowTransform);
 
@@ -94,7 +96,7 @@ namespace Frost9.VFX.Tests
             Object.DestroyImmediate(destroyedTarget);
 
             var destroyedTargetHandle = service.PlayOn(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 destroyedTarget,
                 AttachMode.FollowTransform);
 
@@ -112,7 +114,7 @@ namespace Frost9.VFX.Tests
             target.transform.rotation = Quaternion.Euler(0f, 35f, 0f);
 
             var handle = service.PlayOn(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 target,
                 AttachMode.FollowPositionOnly,
                 VfxParams.Empty.WithLifetimeOverride(5f),
@@ -143,7 +145,7 @@ namespace Frost9.VFX.Tests
         {
             var target = new GameObject("DestroyAttachTarget");
             var handle = service.PlayOn(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 target,
                 AttachMode.FollowTransform,
                 VfxParams.Empty.WithLifetimeOverride(5f),
@@ -163,3 +165,4 @@ namespace Frost9.VFX.Tests
         }
     }
 }
+

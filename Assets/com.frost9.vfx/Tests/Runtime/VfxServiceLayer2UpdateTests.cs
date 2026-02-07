@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
@@ -11,6 +11,8 @@ namespace Frost9.VFX.Tests
     /// </summary>
     public class VfxServiceLayer2UpdateTests
     {
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
+
         private VfxService service;
         private GameObject poolManagerObject;
         private GameObject prefab;
@@ -33,7 +35,7 @@ namespace Frost9.VFX.Tests
             catalog = ScriptableObject.CreateInstance<VfxCatalog>();
             catalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, prefab)
+                new VfxCatalogEntry(DefaultVfxId, prefab)
             });
 
             configuration = ScriptableObject.CreateInstance<VfxSystemConfiguration>();
@@ -88,7 +90,7 @@ namespace Frost9.VFX.Tests
         public void TryUpdate_ValidHandle_UpdatesRunnerState()
         {
             var handle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(5f),
@@ -124,7 +126,7 @@ namespace Frost9.VFX.Tests
         public IEnumerator TryUpdate_StaleHandle_ReturnsFalse()
         {
             var staleHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(0.01f));
@@ -137,7 +139,7 @@ namespace Frost9.VFX.Tests
                 "Expected first instance to auto-release before stale update check.");
 
             var activeHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.one,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(5f),
@@ -276,3 +278,4 @@ namespace Frost9.VFX.Tests
         }
     }
 }
+

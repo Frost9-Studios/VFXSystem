@@ -6,7 +6,7 @@ This folder is intentionally non-package test scaffolding.
 - Quick manual validation for implemented Frost9.VFX runtime features.
 - Uses runtime-generated catalog/config at scene startup.
 - Binds:
-  - `VFXRefs.Effects.VfxPrefab` to one inspector-assigned prefab.
+  - `Effects.VfxPrefab` to one inspector-assigned prefab.
   - `Effects.LinePreview` to a runtime-created `LineArcVfxPlayable` prefab.
 
 ## Setup
@@ -66,4 +66,4 @@ This folder is intentionally non-package test scaffolding.
 - Both bootstrap paths work.
   - Press `B` to switch between Direct and VContainer startup; sandbox reinitializes.
 
-Note: The sandbox maps the assigned prefab to `VFXRefs.Effects.VfxPrefab`, so generated id-path usage is still exercised.
+Note: The sandbox maps the assigned prefab to the stable id string `Effects.VfxPrefab`, so generated refs changes cannot break sandbox compilation.

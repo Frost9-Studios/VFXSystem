@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c130f845c25712048a3a1aa10b8c3ba1, type: 3}
+  m_Name: VfxCatalog
+  m_EditorClassIdentifier: Frost9.VFX::Frost9.VFX.VfxCatalog
+  entries:
+  - id:
+      value: Effects.Explosion
+    prefab: {fileID: 6231179254812234503, guid: 9769217d989b43643952a8ea313d42af, type: 3}
+    initialPoolSize: 0
+    maxPoolSize: 10
+    allowPoolExpansion: 0
+    defaultChannel: 0
+    autoReleaseByDefault: 0
+    fallbackLifetimeSeconds: 0
+    defaultParameters:
+      hasColor: 0
+      color: {r: 0, g: 0, b: 0, a: 0}
+      hasScale: 0
+      scale: 0
+      hasIntensity: 0
+      intensity: 0
+      hasLifetimeOverride: 0
+      lifetimeOverride: 0
+      hasTargetPoint: 0
+      targetPoint: {x: 0, y: 0, z: 0}

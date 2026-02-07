@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Reflection;
 using NUnit.Framework;
 using UnityEngine;
@@ -11,6 +11,8 @@ namespace Frost9.VFX.Tests
     /// </summary>
     public class VfxLineArcPlayableTests
     {
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
+
         private VfxService service;
         private GameObject poolManagerObject;
         private GameObject prefab;
@@ -98,7 +100,7 @@ namespace Frost9.VFX.Tests
             var targetC = new Vector3(8f, 3f, 0f);
 
             var firstHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 startA,
                 Quaternion.identity,
                 VfxParams.Empty.WithTargetPoint(targetA).WithLifetimeOverride(10f),
@@ -136,7 +138,7 @@ namespace Frost9.VFX.Tests
             Assert.AreEqual(0, service.GetStats().TotalActiveInstances);
 
             var secondHandle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 startB,
                 Quaternion.identity,
                 VfxParams.Empty.WithTargetPoint(targetC).WithLifetimeOverride(10f),
@@ -164,7 +166,7 @@ namespace Frost9.VFX.Tests
             bool autoReleaseByDefault,
             float fallbackLifetimeSeconds)
         {
-            var entry = new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, entryPrefab);
+            var entry = new VfxCatalogEntry(DefaultVfxId, entryPrefab);
             SetPrivateField(entry, "initialPoolSize", initialPoolSize);
             SetPrivateField(entry, "maxPoolSize", maxPoolSize);
             SetPrivateField(entry, "allowPoolExpansion", allowPoolExpansion);
@@ -181,3 +183,4 @@ namespace Frost9.VFX.Tests
         }
     }
 }
+

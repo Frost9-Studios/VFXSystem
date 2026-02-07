@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
@@ -11,6 +11,8 @@ namespace Frost9.VFX.Tests
     /// </summary>
     public class VfxPoolFallbackTests
     {
+        private static readonly VfxId DefaultVfxId = new VfxId("Effects.VfxPrefab");
+
         private VfxService service;
         private GameObject poolManagerObject;
         private GameObject prefab;
@@ -33,7 +35,7 @@ namespace Frost9.VFX.Tests
             catalog = ScriptableObject.CreateInstance<VfxCatalog>();
             catalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, prefab)
+                new VfxCatalogEntry(DefaultVfxId, prefab)
             });
 
             configuration = ScriptableObject.CreateInstance<VfxSystemConfiguration>();
@@ -88,7 +90,7 @@ namespace Frost9.VFX.Tests
         public IEnumerator AutoReleaseFallback_Releases_WhenRunnerNeverCompletes()
         {
             var handle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.zero,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(0.15f));
@@ -111,7 +113,7 @@ namespace Frost9.VFX.Tests
         public IEnumerator DestroyedActiveInstance_IsCleanedUp_AndDoesNotLeakActiveCount()
         {
             var handle = service.PlayAt(
-                VFXRefs.Effects.VfxPrefab,
+                DefaultVfxId,
                 Vector3.one,
                 Quaternion.identity,
                 VfxParams.Empty.WithLifetimeOverride(5f));
@@ -234,3 +236,4 @@ namespace Frost9.VFX.Tests
         }
     }
 }
+

@@ -13,6 +13,24 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
 - `VfxManager`: static fallback facade.
 - Catalog-driven ids: `VfxId`, `VfxCatalog`, generated `VFXRefs`.
 
+## Generated Refs Output
+- Generate ids from catalogs: `Tools/Frost9/VFX/Generate VFXRefs`.
+- Catalog scan scope: all project assets matching `t:VfxCatalog`.
+- Output path is fixed: `Assets/Resources/VFX/VFXRefs.cs`.
+- Output folders are created automatically if missing.
+- `Assets/Resources/VFX/Frost9.VFX.Generated.asmref` routes the generated file into the `Frost9.VFX` assembly.
+
+## Catalog Entry Authoring
+- `Id`: string identifier (`VfxId`). Use a stable namespaced format like `Effects.FireballImpact`.
+- `Prefab`: effect prefab that can be played by the service (typically includes `PrefabVfxPlayable` or another `IVfxPlayable` runner).
+- `Initial Pool Size`: prewarm count.
+- `Max Pool Size`: hard cap.
+- `Allow Pool Expansion`: whether runtime can allocate above prewarm count (up to max).
+- `Default Channel`: fallback channel when call-site play options do not override it.
+- `Auto Release By Default`: default release behavior for spawned instances.
+- `Fallback Lifetime Seconds`: safety auto-release timeout for runners that do not signal completion.
+- `Default Parameters`: typed parameter defaults merged with call-site overrides.
+
 ## Quick Start (Direct Service)
 ```csharp
 using Frost9.VFX;

@@ -12,9 +12,9 @@ namespace Frost9.VFX.Editor
     public static class VfxRefsGenerator
     {
         /// <summary>
-        /// Default generated file path under the runtime assembly.
+        /// Default generated file path under project resources (outside the package).
         /// </summary>
-        public const string DefaultOutputPath = "Assets/com.frost9.vfx/Runtime/Generated/VFXRefs.cs";
+        public const string DefaultOutputPath = "Assets/Resources/VFX/VFXRefs.cs";
 
         private static readonly HashSet<string> CSharpKeywords = new HashSet<string>(System.StringComparer.Ordinal)
         {

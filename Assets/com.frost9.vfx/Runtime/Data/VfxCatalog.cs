@@ -11,6 +11,7 @@ namespace Frost9.VFX
     public class VfxCatalog : ScriptableObject
     {
         [SerializeField]
+        [Tooltip("Catalog entries keyed by string-based VfxId values.")]
         private List<VfxCatalogEntry> entries = new List<VfxCatalogEntry>();
 
         private readonly Dictionary<VfxId, VfxCatalogEntry> lookup = new Dictionary<VfxId, VfxCatalogEntry>();
