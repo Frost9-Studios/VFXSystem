@@ -1,11 +1,13 @@
-# VFX Layer 1 Sandbox
+# VFX Runtime Sandbox
 
 This folder is intentionally non-package test scaffolding.
 
 ## Purpose
-- Quick manual validation for `Frost9.VFX` Layer 1 behavior.
+- Quick manual validation for implemented Frost9.VFX runtime features.
 - Uses runtime-generated catalog/config at scene startup.
-- Binds `VFXRefs.Effects.VfxPrefab` to one inspector-assigned prefab.
+- Binds:
+  - `VFXRefs.Effects.VfxPrefab` to one inspector-assigned prefab.
+  - `Effects.LinePreview` to a runtime-created `LineArcVfxPlayable` prefab.
 
 ## Setup
 1. Create/open a scene under `Assets/_Project/`.
@@ -15,16 +17,29 @@ This folder is intentionally non-package test scaffolding.
 5. Press Play.
 
 ## Controls
-- `LMB`: Spawn at mouse position.
-- `1`: Spawn at origin.
-- `2`: Spawn radial burst for pooling stress.
-- `O`: Spawn on moving attach target.
-- `U`: TryUpdate on last handle (color/scale/intensity).
-- `S`: Stop last handle.
-- `G`: `StopAll()` default (Gameplay channel only).
-- `Shift+G`: explicit global stop (`VfxStopFilter.Global`).
-- `H`: stale-handle safety check (expected stale stop = false).
-- `V`: deterministic pool-reuse verification (logs whether second burst reused pooled instances).
+- Spawn / Attach
+  - `LMB`: `PlayAt(mouse)`
+  - `1`: `PlayAt(origin)`
+  - `2`: radial burst stress spawn
+  - `O`: `PlayOn(target)` with current attach mode
+  - `P`: cycle attach mode (`FollowTransform` -> `FollowPositionOnly` -> `WorldLocked`)
+  - `I`: toggle `IgnoreTargetScale`
+- Line runner
+  - `L`: spawn line preview
+  - `T`: `TryUpdate` line endpoint to mouse
+  - `K`: stop line handle
+- Handle / scope
+  - `U`: `TryUpdate(last prefab handle)`
+  - `S`: `Stop(last prefab handle)`
+  - `C`: spawn persistent UI-channel effect
+  - `G`: `StopAll()` default (Gameplay only)
+  - `Shift+G`: `StopAll(VfxStopFilter.Global)`
+- Verification / tooling
+  - `H`: stale-handle safety check
+  - `V`: deterministic pool-reuse check
+  - `R`: reinitialize service
+  - `B`: toggle bootstrap mode (`DirectService` / `VContainerHelper`) and reinitialize
+  - `M`: toggle overlay visibility
 
 ## Inspector Debug Options
 - `Show On Screen Overlay`: runtime Canvas stats panel.
@@ -32,11 +47,23 @@ This folder is intentionally non-package test scaffolding.
   - Off: pool lives in `DontDestroyOnLoad`.
   - On: pool stays in active scene hierarchy for easier inspection.
 - `Enable Periodic Stats Log`: writes pool stats to Console on interval.
+- `Bootstrap Mode`: choose direct service startup or VContainer helper startup.
 
-## What to verify
+## What to verify quickly
 - Effects spawn and auto-release.
-- Repeated burst spawn reuses instances (stats change smoothly).
-- `StopAll()` default does not hard-kill non-gameplay channels.
-- Stale handle stop returns `false`, fresh handle stop returns `true`.
+- Repeated burst spawn reuses instances.
+  - Press `V` and confirm console/overlay reports `CreatedDeltaSecondWave=0`.
+- Default stop scope is safe.
+  - Press `C`, then `G`.
+  - UI handle should remain active (`UI alive ... expected true`).
+  - Press `Shift+G` to stop globally.
+- Stale handle protection works.
+  - Press `H` and confirm stale stop is `false`, fresh stop is `true`.
+- Attach behavior changes with mode toggles.
+  - Press `P` then `O` repeatedly and observe different follow behavior.
+- Line runner updates in place.
+  - Press `L`, move mouse, press `T`, endpoint should move.
+- Both bootstrap paths work.
+  - Press `B` to switch between Direct and VContainer startup; sandbox reinitializes.
 
-Note: The sandbox maps the assigned `Effect Prefab` to `VFXRefs.Effects.VfxPrefab` internally so Layer 1 id-path behavior is still exercised.
+Note: The sandbox maps the assigned prefab to `VFXRefs.Effects.VfxPrefab`, so generated id-path usage is still exercised.

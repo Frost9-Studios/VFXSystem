@@ -10,8 +10,9 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - `Frost9.VFX.Tests` (tests)
 
 ## Dependencies
-- Runtime hard dependencies: Unity only.
+- Core runtime APIs (`IVfxService`, `VfxService`, `VfxManager`) depend on Unity only.
 - No gameplay/project-specific dependencies in package runtime.
+- VContainer integration helpers require the `jp.hadashikick.vcontainer` package.
 
 ## Runtime API
 - `IVfxService`
@@ -49,7 +50,29 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - menu item: `Tools/Frost9/VFX/Generate VFXRefs`
   - generator sorts by `VfxId` string
   - deterministic identifier sanitization + collision suffixing
-  - safe write behavior (temp replace and no-op when content unchanged)
+- safe write behavior (temp replace and no-op when content unchanged)
+
+## VContainer Integration (Optional)
+- Namespace: `Frost9.VFX.Integration.VContainer`
+- Helper methods:
+  - `RegisterVfx(...)`
+  - `RegisterVfxWithExistingPool(...)`
+- Behavior:
+  - Audio-style DI wiring (`IVfxService` is container-constructed, not manually `new`'d in registration).
+  - `dontDestroyOnLoad` is exposed and defaults to `true`.
+  - Pool manager creation is `create-or-reuse` by GameObject name to prevent duplicates.
+
+```csharp
+using Frost9.VFX.Integration.VContainer;
+using VContainer;
+
+public override void Configure(IContainerBuilder builder)
+{
+    builder.RegisterVfx(
+        poolManagerObjectName: "VFXSystem_PoolManager",
+        dontDestroyOnLoad: true);
+}
+```
 
 ## Pooling and Safety
 - Per-id pooling via `VfxPoolManager`.
@@ -89,4 +112,16 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - deterministic sanitization and collision handling (`_2`, `_3`, ...)
   - safe write with unchanged-content short-circuit
   - editor tests for ordering, sanitization/collision, and unchanged second-run behavior
-- Layer 3C pending: diagnostics window.
+- Layer 3C complete: diagnostics window.
+- Layer 3C includes:
+  - read-only diagnostics window: `Tools/Frost9/VFX/Diagnostics`
+  - play-mode aware status messaging when runtime stats are unavailable
+  - per-pool-manager summary and per-id stats table
+  - throttled polling to keep editor overhead low
+  - editor tests for collector status and window open behavior
+- Layer 3D complete: optional VContainer helper registration.
+- Layer 3D includes:
+  - guarded integration under `Runtime/Integration/VContainer/`
+  - `RegisterVfx(...)` and `RegisterVfxWithExistingPool(...)`
+  - default `DontDestroyOnLoad` behavior with pool-manager reuse by name
+  - runtime integration tests for reuse/default/existing-pool registration paths

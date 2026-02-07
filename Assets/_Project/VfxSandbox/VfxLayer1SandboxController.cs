@@ -1,19 +1,28 @@
 using System.Collections;
+using Frost9.VFX;
+using Frost9.VFX.Integration.VContainer;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
 using UnityEngine.UI;
-using Frost9.VFX;
+using VContainer;
 
 namespace Project.VfxSandbox
 {
     /// <summary>
-    /// Manual sandbox for validating Layer 1 VFX behavior without touching package runtime code.
+    /// Manual sandbox for validating Frost9.VFX runtime behavior from Play Mode.
     /// </summary>
     public class VfxLayer1SandboxController : MonoBehaviour
     {
+        private enum SandboxBootstrapMode
+        {
+            DirectService = 0,
+            VContainerHelper = 1
+        }
+
         [Header("Catalog Binding")]
         [SerializeField]
-        [Tooltip("Prefab used as the test effect in this sandbox catalog.")]
+        [Tooltip("Prefab used as the generic runtime prefab effect id (Effects.VfxPrefab).")]
         private GameObject vfxPrefab;
 
         [SerializeField]
@@ -21,7 +30,7 @@ namespace Project.VfxSandbox
         private Camera targetCamera;
 
         [SerializeField]
-        [Tooltip("Optional target used by PlayOn tests.")]
+        [Tooltip("Optional target used by PlayOn attach tests.")]
         private Transform attachTarget;
 
         [SerializeField]
@@ -32,20 +41,33 @@ namespace Project.VfxSandbox
         [Tooltip("Auto-configure a basic camera + light layout when the scene is empty.")]
         private bool autoConfigureSceneDefaults = true;
 
+        [Header("Bootstrap")]
+        [SerializeField]
+        [Tooltip("How the sandbox creates IVfxService.")]
+        private SandboxBootstrapMode bootstrapMode = SandboxBootstrapMode.DirectService;
+
+        [SerializeField]
+        [Tooltip("Allow runtime toggle between Direct and VContainer bootstrap modes with B.")]
+        private bool allowRuntimeBootstrapToggle = true;
+
+        [SerializeField]
+        [Tooltip("Pool manager object name used by both direct and VContainer startup paths.")]
+        private string poolManagerObjectName = "Sandbox_VFXPoolManager";
+
         [Header("Spawn Settings")]
         [SerializeField]
         [Min(0.01f)]
-        [Tooltip("Default effect lifetime override in seconds.")]
+        [Tooltip("Default prefab-effect lifetime override in seconds.")]
         private float defaultLifetimeSeconds = 1.2f;
 
         [SerializeField]
         [Min(1)]
-        [Tooltip("How many effects to spawn for the spam test.")]
+        [Tooltip("How many effects to spawn for the burst stress test.")]
         private int spamCount = 24;
 
         [SerializeField]
         [Min(0.1f)]
-        [Tooltip("Radius used for radial spam spawns.")]
+        [Tooltip("Radius used for radial burst spawns.")]
         private float spamRadius = 4f;
 
         [SerializeField]
@@ -59,6 +81,16 @@ namespace Project.VfxSandbox
         private float verificationLifetimeSeconds = 0.35f;
 
         [SerializeField]
+        [Tooltip("Default color used by the runtime line preview effect.")]
+        private Color linePreviewColor = new Color(0.15f, 0.9f, 1f, 1f);
+
+        [SerializeField]
+        [Min(0.01f)]
+        [Tooltip("Default width used by line preview tests.")]
+        private float linePreviewWidth = 0.08f;
+
+        [Header("Diagnostics UI")]
+        [SerializeField]
         [Tooltip("Draw keyboard controls and stats via runtime Canvas overlay.")]
         private bool showOnScreenOverlay = true;
 
@@ -67,7 +99,7 @@ namespace Project.VfxSandbox
         private bool showPoolRootInSceneHierarchy;
 
         [SerializeField]
-        [Tooltip("Write periodic stats to the Console as a fallback when UI is not visible.")]
+        [Tooltip("Write periodic stats to Console as a fallback if overlay is hidden.")]
         private bool enablePeriodicStatsLog = true;
 
         [SerializeField]
@@ -75,16 +107,26 @@ namespace Project.VfxSandbox
         [Tooltip("Interval for periodic stats logs in seconds.")]
         private float statsLogIntervalSeconds = 2f;
 
+        private static readonly VfxId LinePreviewId = new VfxId("Effects.LinePreview");
+
         private IVfxService vfxService;
+        private IObjectResolver vfxResolver;
         private VfxCatalog runtimeCatalog;
         private VfxSystemConfiguration runtimeConfiguration;
         private GameObject poolManagerObject;
-        private VfxHandle lastHandle;
+        private GameObject linePreviewPrefab;
+        private Material linePreviewMaterial;
+        private VfxHandle lastPrefabHandle;
+        private VfxHandle lastUiHandle;
+        private VfxHandle lastLineHandle;
+        private AttachMode attachMode = AttachMode.FollowTransform;
+        private bool ignoreTargetScaleOnAttach;
         private bool isRunningStaleHandleCheck;
         private bool isRunningPoolReuseCheck;
         private Canvas overlayCanvas;
         private Text overlayText;
         private float nextStatsLogTime;
+        private string lastActionMessage = "Ready.";
 
         /// <summary>
         /// Initializes sandbox runtime objects and service.
@@ -103,7 +145,7 @@ namespace Project.VfxSandbox
 
             if (vfxPrefab == null)
             {
-                Debug.LogError("[VfxLayer1Sandbox] No vfxPrefab assigned. Sandbox disabled.");
+                Debug.LogError("[VfxSandbox] No VFX prefab assigned. Sandbox disabled.");
                 enabled = false;
                 return;
             }
@@ -150,24 +192,21 @@ namespace Project.VfxSandbox
                 SpawnOnTarget();
             }
 
-            if (keyboard.sKey.wasPressedThisFrame)
+            if (keyboard.pKey.wasPressedThisFrame)
             {
-                var stopped = vfxService.Stop(lastHandle);
-                Debug.Log($"[VfxLayer1Sandbox] Stop(lastHandle) -> {stopped}");
+                CycleAttachMode();
             }
 
-            if (keyboard.gKey.wasPressedThisFrame)
+            if (keyboard.iKey.wasPressedThisFrame)
             {
-                if (keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed)
-                {
-                    var globalStopped = vfxService.StopAll(VfxStopFilter.Global);
-                    Debug.Log($"[VfxLayer1Sandbox] StopAll(Global) stopped {globalStopped} effects.");
-                }
-                else
-                {
-                    var defaultStopped = vfxService.StopAll();
-                    Debug.Log($"[VfxLayer1Sandbox] StopAll(Default Gameplay) stopped {defaultStopped} effects.");
-                }
+                ignoreTargetScaleOnAttach = !ignoreTargetScaleOnAttach;
+                SetActionMessage($"Ignore target scale: {ignoreTargetScaleOnAttach}");
+            }
+
+            if (keyboard.sKey.wasPressedThisFrame)
+            {
+                var stopped = vfxService.Stop(lastPrefabHandle);
+                SetActionMessage($"Stop(last prefab handle) -> {stopped}");
             }
 
             if (keyboard.uKey.wasPressedThisFrame)
@@ -177,8 +216,34 @@ namespace Project.VfxSandbox
                     .WithIntensity(Random.Range(0.5f, 1.8f))
                     .WithColor(Random.ColorHSV(0f, 1f, 0.7f, 1f, 0.7f, 1f));
 
-                var updated = vfxService.TryUpdate(lastHandle, in update);
-                Debug.Log($"[VfxLayer1Sandbox] TryUpdate(lastHandle) -> {updated}");
+                var updated = vfxService.TryUpdate(lastPrefabHandle, in update);
+                SetActionMessage($"TryUpdate(last prefab handle) -> {updated}");
+            }
+
+            if (keyboard.cKey.wasPressedThisFrame)
+            {
+                SpawnUiChannelEffect();
+            }
+
+            if (keyboard.gKey.wasPressedThisFrame)
+            {
+                StopByScope(keyboard.leftShiftKey.isPressed || keyboard.rightShiftKey.isPressed);
+            }
+
+            if (keyboard.lKey.wasPressedThisFrame)
+            {
+                SpawnOrUpdateLinePreview(forceRespawn: true);
+            }
+
+            if (keyboard.tKey.wasPressedThisFrame)
+            {
+                UpdateLineTargetFromMouse();
+            }
+
+            if (keyboard.kKey.wasPressedThisFrame)
+            {
+                var stopped = vfxService.Stop(lastLineHandle);
+                SetActionMessage($"Stop(line handle) -> {stopped}");
             }
 
             if (keyboard.hKey.wasPressedThisFrame && !isRunningStaleHandleCheck)
@@ -191,6 +256,29 @@ namespace Project.VfxSandbox
                 StartCoroutine(RunPoolReuseVerification());
             }
 
+            if (keyboard.rKey.wasPressedThisFrame)
+            {
+                ReinitializeService("Service reset (R)");
+            }
+
+            if (allowRuntimeBootstrapToggle && keyboard.bKey.wasPressedThisFrame)
+            {
+                bootstrapMode = bootstrapMode == SandboxBootstrapMode.DirectService
+                    ? SandboxBootstrapMode.VContainerHelper
+                    : SandboxBootstrapMode.DirectService;
+
+                ReinitializeService($"Bootstrap mode switched to {bootstrapMode}");
+            }
+
+            if (keyboard.mKey.wasPressedThisFrame)
+            {
+                showOnScreenOverlay = !showOnScreenOverlay;
+                if (overlayCanvas != null)
+                {
+                    overlayCanvas.enabled = showOnScreenOverlay;
+                }
+            }
+
             UpdateOverlayText();
             TickStatsLog();
         }
@@ -200,36 +288,41 @@ namespace Project.VfxSandbox
         /// </summary>
         private void OnDestroy()
         {
-            vfxService?.Dispose();
-            vfxService = null;
+            ShutdownService();
 
-            if (runtimeCatalog != null)
-            {
-                Destroy(runtimeCatalog);
-            }
+            DestroyUnityObject(runtimeCatalog);
+            runtimeCatalog = null;
 
-            if (runtimeConfiguration != null)
-            {
-                Destroy(runtimeConfiguration);
-            }
+            DestroyUnityObject(runtimeConfiguration);
+            runtimeConfiguration = null;
 
-            if (poolManagerObject != null)
-            {
-                Destroy(poolManagerObject);
-            }
+            DestroyUnityObject(linePreviewPrefab);
+            linePreviewPrefab = null;
+
+            DestroyUnityObject(linePreviewMaterial);
+            linePreviewMaterial = null;
 
             if (overlayCanvas != null)
             {
-                Destroy(overlayCanvas.gameObject);
+                DestroyUnityObject(overlayCanvas.gameObject);
+                overlayCanvas = null;
             }
         }
 
         private void InitializeService()
         {
+            DestroyUnityObject(runtimeCatalog);
+            DestroyUnityObject(runtimeConfiguration);
+            DestroyUnityObject(linePreviewPrefab);
+            DestroyUnityObject(linePreviewMaterial);
+
+            linePreviewPrefab = CreateLinePreviewPrefab();
+
             runtimeCatalog = ScriptableObject.CreateInstance<VfxCatalog>();
             runtimeCatalog.SetEntries(new[]
             {
-                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, vfxPrefab)
+                new VfxCatalogEntry(VFXRefs.Effects.VfxPrefab, vfxPrefab),
+                new VfxCatalogEntry(LinePreviewId, linePreviewPrefab)
             });
 
             runtimeConfiguration = ScriptableObject.CreateInstance<VfxSystemConfiguration>();
@@ -241,12 +334,117 @@ namespace Project.VfxSandbox
                 dontDestroyPoolRoot: !showPoolRootInSceneHierarchy,
                 configuredPoolRootName: "Sandbox_VFXPoolRoot");
 
-            poolManagerObject = new GameObject("Sandbox_VFXPoolManager");
+            if (bootstrapMode == SandboxBootstrapMode.VContainerHelper)
+            {
+                InitializeViaVContainer();
+            }
+            else
+            {
+                InitializeDirect();
+            }
+
+            lastPrefabHandle = VfxHandle.Invalid;
+            lastUiHandle = VfxHandle.Invalid;
+            lastLineHandle = VfxHandle.Invalid;
+
+            var poolScope = showPoolRootInSceneHierarchy ? "active scene hierarchy" : "DontDestroyOnLoad";
+            SetActionMessage(
+                $"Initialized via {bootstrapMode}. " +
+                $"Pool manager: {poolManagerObjectName} ({poolScope}).");
+        }
+
+        private void InitializeDirect()
+        {
+            poolManagerObject = new GameObject(poolManagerObjectName);
             var poolManager = poolManagerObject.AddComponent<VfxPoolManager>();
             vfxService = new VfxService(poolManager, runtimeCatalog, runtimeConfiguration);
+        }
 
-            var poolScope = showPoolRootInSceneHierarchy ? "active scene hierarchy" : "DontDestroyOnLoad scene";
-            Debug.Log($"[VfxLayer1Sandbox] Pool manager initialized. Look for 'Sandbox_VFXPoolManager' under {poolScope}.");
+        private void InitializeViaVContainer()
+        {
+            var builder = new ContainerBuilder();
+            builder.RegisterVfx(
+                catalog: runtimeCatalog,
+                configuration: runtimeConfiguration,
+                poolManagerObjectName: poolManagerObjectName,
+                dontDestroyOnLoad: !showPoolRootInSceneHierarchy);
+
+            vfxResolver = builder.Build();
+            vfxService = vfxResolver.Resolve<IVfxService>();
+            poolManagerObject = FindPoolManagerObject(poolManagerObjectName);
+        }
+
+        private void ShutdownService()
+        {
+            if (vfxResolver != null)
+            {
+                vfxResolver.Dispose();
+                vfxResolver = null;
+            }
+
+            if (vfxService != null)
+            {
+                vfxService.Dispose();
+                vfxService = null;
+            }
+
+            if (poolManagerObject == null)
+            {
+                poolManagerObject = FindPoolManagerObject(poolManagerObjectName);
+            }
+
+            DestroyUnityObject(poolManagerObject);
+            poolManagerObject = null;
+        }
+
+        private void ReinitializeService(string reason)
+        {
+            ShutdownService();
+            InitializeService();
+            SetActionMessage(reason);
+        }
+
+        private static GameObject FindPoolManagerObject(string name)
+        {
+            var managers = Object.FindObjectsByType<VfxPoolManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (var i = 0; i < managers.Length; i++)
+            {
+                var manager = managers[i];
+                if (manager != null &&
+                    manager.gameObject != null &&
+                    manager.gameObject.name == name)
+                {
+                    return manager.gameObject;
+                }
+            }
+
+            return null;
+        }
+
+        private GameObject CreateLinePreviewPrefab()
+        {
+            var prefab = new GameObject("Sandbox_LinePreviewPrefab");
+            var lineRenderer = prefab.AddComponent<LineRenderer>();
+            lineRenderer.useWorldSpace = true;
+            lineRenderer.positionCount = 0;
+            lineRenderer.widthMultiplier = linePreviewWidth;
+            lineRenderer.receiveShadows = false;
+            lineRenderer.shadowCastingMode = ShadowCastingMode.Off;
+            lineRenderer.textureMode = LineTextureMode.Stretch;
+
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ??
+                         Shader.Find("Sprites/Default") ??
+                         Shader.Find("Unlit/Color");
+            linePreviewMaterial = shader != null ? new Material(shader) : null;
+            if (linePreviewMaterial != null)
+            {
+                linePreviewMaterial.color = linePreviewColor;
+                lineRenderer.material = linePreviewMaterial;
+            }
+
+            prefab.AddComponent<LineArcVfxPlayable>();
+            prefab.SetActive(false);
+            return prefab;
         }
 
         private void EnsureAttachTarget()
@@ -266,12 +464,7 @@ namespace Project.VfxSandbox
 
         private void EnsureSceneDefaults()
         {
-            var camera = Camera.main;
-            if (camera == null)
-            {
-                camera = Object.FindFirstObjectByType<Camera>();
-            }
-
+            var camera = Camera.main ?? Object.FindFirstObjectByType<Camera>();
             if (camera == null)
             {
                 var cameraObject = new GameObject("Main Camera");
@@ -302,7 +495,8 @@ namespace Project.VfxSandbox
         private void SpawnAtPoint(Vector3 point)
         {
             var parameters = VfxParams.Empty.WithLifetimeOverride(defaultLifetimeSeconds);
-            lastHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, point, Quaternion.identity, parameters);
+            lastPrefabHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, point, Quaternion.identity, parameters);
+            SetActionMessage($"Spawn prefab at {point} -> {lastPrefabHandle.IsValid}");
         }
 
         private void SpawnSpamBurst()
@@ -318,15 +512,17 @@ namespace Project.VfxSandbox
                     .WithLifetimeOverride(Random.Range(0.6f, 1.8f))
                     .WithScale(Random.Range(0.75f, 1.45f));
 
-                lastHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, position, Quaternion.identity, parameters);
+                lastPrefabHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, position, Quaternion.identity, parameters);
             }
+
+            SetActionMessage($"Burst spawned: {spamCount} effects.");
         }
 
         private void SpawnOnTarget()
         {
             if (attachTarget == null)
             {
-                Debug.LogWarning("[VfxLayer1Sandbox] No attach target assigned.");
+                SetActionMessage("No attach target assigned.");
                 return;
             }
 
@@ -334,11 +530,86 @@ namespace Project.VfxSandbox
                 .WithLifetimeOverride(2f)
                 .WithScale(1.2f);
 
-            lastHandle = vfxService.PlayOn(
+            var options = VfxPlayOptions.DefaultGameplay
+                .WithIgnoreTargetScale(ignoreTargetScaleOnAttach);
+
+            lastPrefabHandle = vfxService.PlayOn(
                 VFXRefs.Effects.VfxPrefab,
                 attachTarget.gameObject,
-                AttachMode.FollowTransform,
-                parameters);
+                attachMode,
+                parameters,
+                options);
+
+            SetActionMessage(
+                $"PlayOn target -> {lastPrefabHandle.IsValid} | Mode={attachMode} | IgnoreScale={ignoreTargetScaleOnAttach}");
+        }
+
+        private void SpawnUiChannelEffect()
+        {
+            var position = new Vector3(-4f, 0f, -2f);
+            var parameters = VfxParams.Empty.WithLifetimeOverride(6f);
+            var options = VfxPlayOptions.DefaultGameplay
+                .WithChannel(VfxChannel.UI)
+                .WithAutoRelease(false);
+
+            lastUiHandle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, position, Quaternion.identity, parameters, options);
+            SetActionMessage($"Spawn UI-channel effect -> {lastUiHandle.IsValid}");
+        }
+
+        private void StopByScope(bool global)
+        {
+            var stopped = global
+                ? vfxService.StopAll(VfxStopFilter.Global)
+                : vfxService.StopAll();
+
+            var uiStillActive = vfxService.TryUpdate(lastUiHandle, VfxParams.Empty);
+            SetActionMessage(
+                global
+                    ? $"StopAll(Global) stopped {stopped}. UI alive after stop: {uiStillActive} (expected false)."
+                    : $"StopAll(Default Gameplay) stopped {stopped}. UI alive after stop: {uiStillActive} (expected true).");
+        }
+
+        private void SpawnOrUpdateLinePreview(bool forceRespawn)
+        {
+            var targetPoint = ResolveMouseSpawnPoint(GetPointerPositionOrScreenCenter());
+            if (!forceRespawn && vfxService.TryUpdate(lastLineHandle, VfxParams.Empty.WithTargetPoint(targetPoint)))
+            {
+                SetActionMessage("Line target updated.");
+                return;
+            }
+
+            var start = attachTarget != null ? attachTarget.position : Vector3.zero;
+            var parameters = VfxParams.Empty
+                .WithTargetPoint(targetPoint)
+                .WithColor(linePreviewColor)
+                .WithIntensity(1f)
+                .WithScale(linePreviewWidth)
+                .WithLifetimeOverride(0f);
+
+            var options = VfxPlayOptions.DefaultGameplay.WithAutoRelease(false);
+            lastLineHandle = vfxService.PlayAt(LinePreviewId, start, Quaternion.identity, parameters, options);
+            SetActionMessage($"Spawn line preview -> {lastLineHandle.IsValid}");
+        }
+
+        private void UpdateLineTargetFromMouse()
+        {
+            var targetPoint = ResolveMouseSpawnPoint(GetPointerPositionOrScreenCenter());
+            var updated = vfxService.TryUpdate(
+                lastLineHandle,
+                VfxParams.Empty.WithTargetPoint(targetPoint).WithColor(linePreviewColor));
+            SetActionMessage($"TryUpdate(line target) -> {updated}");
+        }
+
+        private void CycleAttachMode()
+        {
+            attachMode = attachMode switch
+            {
+                AttachMode.WorldLocked => AttachMode.FollowTransform,
+                AttachMode.FollowTransform => AttachMode.FollowPositionOnly,
+                _ => AttachMode.WorldLocked
+            };
+
+            SetActionMessage($"Attach mode: {attachMode}");
         }
 
         private Vector3 ResolveMouseSpawnPoint(Vector2 pointerPosition)
@@ -371,7 +642,7 @@ namespace Project.VfxSandbox
 
         private void EnsureOverlayUI()
         {
-            if (!showOnScreenOverlay || overlayCanvas != null)
+            if (overlayCanvas != null)
             {
                 return;
             }
@@ -379,7 +650,8 @@ namespace Project.VfxSandbox
             var canvasObject = new GameObject("VfxSandboxOverlayCanvas");
             overlayCanvas = canvasObject.AddComponent<Canvas>();
             overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            overlayCanvas.sortingOrder = 2000;
+            overlayCanvas.sortingOrder = 5000;
+            overlayCanvas.enabled = showOnScreenOverlay;
 
             var scaler = canvasObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -396,23 +668,23 @@ namespace Project.VfxSandbox
             panelRect.anchorMin = new Vector2(0f, 1f);
             panelRect.anchorMax = new Vector2(0f, 1f);
             panelRect.pivot = new Vector2(0f, 1f);
-            panelRect.anchoredPosition = new Vector2(12f, -12f);
-            panelRect.sizeDelta = new Vector2(660f, 250f);
+            panelRect.anchoredPosition = new Vector2(10f, -10f);
+            panelRect.sizeDelta = new Vector2(900f, 510f);
 
             var panelImage = panelObject.AddComponent<Image>();
-            panelImage.color = new Color(0f, 0f, 0f, 0.55f);
+            panelImage.color = new Color(0f, 0f, 0f, 0.68f);
 
             var textObject = new GameObject("Text");
             textObject.transform.SetParent(panelObject.transform, false);
             var textRect = textObject.AddComponent<RectTransform>();
             textRect.anchorMin = new Vector2(0f, 0f);
             textRect.anchorMax = new Vector2(1f, 1f);
-            textRect.offsetMin = new Vector2(10f, 10f);
-            textRect.offsetMax = new Vector2(-10f, -10f);
+            textRect.offsetMin = new Vector2(10f, 8f);
+            textRect.offsetMax = new Vector2(-10f, -8f);
 
             overlayText = textObject.AddComponent<Text>();
             overlayText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            overlayText.fontSize = 17;
+            overlayText.fontSize = 14;
             overlayText.color = Color.white;
             overlayText.alignment = TextAnchor.UpperLeft;
             overlayText.horizontalOverflow = HorizontalWrapMode.Wrap;
@@ -429,17 +701,30 @@ namespace Project.VfxSandbox
             }
 
             var stats = vfxService.GetStats();
-            var poolScope = showPoolRootInSceneHierarchy ? "Scene" : "DontDestroyOnLoad";
+            var poolScope = showPoolRootInSceneHierarchy ? "Scene Hierarchy" : "DontDestroyOnLoad";
+            var currentBootstrap = bootstrapMode.ToString();
 
             overlayText.text =
-                "VFX Layer 1 Sandbox\n" +
-                "LMB: Spawn | 1: Origin | 2: Burst | O: PlayOn\n" +
-                "U: TryUpdate(last) | S: Stop(last) | H: Stale-handle check | V: Pool verify\n" +
-                "G: StopAll(Gameplay) | Shift+G: StopAll(Global)\n\n" +
-                $"Pool Scope: {poolScope} (Object: Sandbox_VFXPoolManager)\n" +
-                $"Stats -> Active: {stats.TotalActiveInstances}, Pooled: {stats.TotalPooledInstances}, " +
-                $"Created: {stats.TotalCreatedInstances}, Recycled: {stats.TotalRecycleCount}\n" +
-                $"Last Handle Valid: {lastHandle.IsValid}";
+                "Frost9.VFX Sandbox\n" +
+                $"Bootstrap: {currentBootstrap} (B toggles) | Pool Scope: {poolScope}\n" +
+                $"Attach Mode: {attachMode} | Ignore Target Scale: {ignoreTargetScaleOnAttach}\n\n" +
+                "Spawn / Attach\n" +
+                "  LMB: PlayAt(mouse)  | 1: PlayAt(origin) | 2: Burst spawn\n" +
+                "  O: PlayOn(target)   | P: Cycle attach mode | I: Toggle ignore-scale\n\n" +
+                "Line Runner\n" +
+                "  L: Spawn line preview | T: Update line target to mouse | K: Stop line\n\n" +
+                "Handle / Scope\n" +
+                "  U: TryUpdate(last prefab) | S: Stop(last prefab)\n" +
+                "  C: Spawn UI-channel effect (persistent)\n" +
+                "  G: StopAll(default Gameplay) | Shift+G: StopAll(Global)\n\n" +
+                "Verification\n" +
+                "  H: Stale-handle check (expect stale=false, fresh=true)\n" +
+                "  V: Pool reuse check (expect CreatedDeltaSecondWave=0)\n" +
+                "  R: Reinitialize service | M: Toggle overlay\n\n" +
+                $"Stats: Active={stats.TotalActiveInstances} Pooled={stats.TotalPooledInstances} " +
+                $"Created={stats.TotalCreatedInstances} Recycled={stats.TotalRecycleCount}\n" +
+                $"Handles: Prefab={lastPrefabHandle.IsValid} UI={lastUiHandle.IsValid} Line={lastLineHandle.IsValid}\n" +
+                $"Last: {lastActionMessage}";
         }
 
         private void TickStatsLog()
@@ -457,7 +742,7 @@ namespace Project.VfxSandbox
             nextStatsLogTime = Time.unscaledTime + statsLogIntervalSeconds;
             var stats = vfxService.GetStats();
             Debug.Log(
-                $"[VfxLayer1Sandbox][Stats] Active={stats.TotalActiveInstances} " +
+                $"[VfxSandbox][Stats] Bootstrap={bootstrapMode} Active={stats.TotalActiveInstances} " +
                 $"Pooled={stats.TotalPooledInstances} Created={stats.TotalCreatedInstances} Recycled={stats.TotalRecycleCount}");
         }
 
@@ -483,8 +768,9 @@ namespace Project.VfxSandbox
                 var staleStop = vfxService.Stop(shortHandle);
                 var validStop = vfxService.Stop(longHandle);
 
-                Debug.Log($"[VfxLayer1Sandbox] Stale handle stop expected false -> {staleStop}");
-                Debug.Log($"[VfxLayer1Sandbox] Fresh handle stop expected true -> {validStop}");
+                SetActionMessage(
+                    $"Stale-handle check: stale stop={staleStop} (expected false), " +
+                    $"fresh stop={validStop} (expected true).");
             }
             finally
             {
@@ -497,7 +783,6 @@ namespace Project.VfxSandbox
             isRunningPoolReuseCheck = true;
             try
             {
-                Debug.Log("[VfxLayer1Sandbox] Pool reuse verification started.");
                 var center = Vector3.zero;
 
                 SpawnVerificationBurst(center);
@@ -507,14 +792,11 @@ namespace Project.VfxSandbox
                 SpawnVerificationBurst(center + Vector3.forward * 2f);
                 yield return new WaitForSeconds(0.05f);
                 var duringSecondWave = vfxService.GetStats();
-                var createdDeltaSecondWave = duringSecondWave.TotalCreatedInstances - afterFirstWave.TotalCreatedInstances;
 
+                var createdDeltaSecondWave = duringSecondWave.TotalCreatedInstances - afterFirstWave.TotalCreatedInstances;
                 var reuseLikely = createdDeltaSecondWave == 0;
-                Debug.Log(
-                    $"[VfxLayer1Sandbox] Pool reuse verification result: Reused={reuseLikely} " +
-                    $"CreatedDeltaSecondWave={createdDeltaSecondWave} " +
-                    $"AfterFirst(Created={afterFirstWave.TotalCreatedInstances}, Recycled={afterFirstWave.TotalRecycleCount}) " +
-                    $"DuringSecond(Created={duringSecondWave.TotalCreatedInstances}, Recycled={duringSecondWave.TotalRecycleCount}).");
+                SetActionMessage(
+                    $"Pool reuse check: reused={reuseLikely}, CreatedDeltaSecondWave={createdDeltaSecondWave}.");
             }
             finally
             {
@@ -530,6 +812,29 @@ namespace Project.VfxSandbox
                 var offset = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 2f;
                 var parameters = VfxParams.Empty.WithLifetimeOverride(verificationLifetimeSeconds);
                 vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, center + offset, Quaternion.identity, parameters);
+            }
+        }
+
+        private void SetActionMessage(string message)
+        {
+            lastActionMessage = message;
+            Debug.Log($"[VfxSandbox] {message}");
+        }
+
+        private static void DestroyUnityObject(Object target)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(target);
+            }
+            else
+            {
+                DestroyImmediate(target);
             }
         }
     }

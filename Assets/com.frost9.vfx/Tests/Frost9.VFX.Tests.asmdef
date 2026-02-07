@@ -2,7 +2,8 @@
     "name": "Frost9.VFX.Tests",
     "rootNamespace": "Frost9.VFX.Tests",
     "references": [
-        "Frost9.VFX"
+        "Frost9.VFX",
+        "VContainer"
     ],
     "optionalUnityReferences": [
         "TestAssemblies"
@@ -18,6 +19,12 @@
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "jp.hadashikick.vcontainer",
+            "expression": "",
+            "define": "VCONTAINER_AVAILABLE"
+        }
+    ],
     "noEngineReferences": false
 }

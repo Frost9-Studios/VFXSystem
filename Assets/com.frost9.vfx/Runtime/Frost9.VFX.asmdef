@@ -1,7 +1,9 @@
 {
     "name": "Frost9.VFX",
     "rootNamespace": "Frost9.VFX",
-    "references": [],
+    "references": [
+        "VContainer"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
