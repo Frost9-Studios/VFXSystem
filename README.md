@@ -10,9 +10,9 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - `Frost9.VFX.Tests` (tests)
 
 ## Dependencies
-- Core runtime APIs (`IVfxService`, `VfxService`, `VfxManager`) depend on Unity only.
+- Core runtime APIs (`IVfxService`, `VfxService`, `VfxManager`) depend on Unity APIs and package runtime assets only.
 - No gameplay/project-specific dependencies in package runtime.
-- VContainer integration helpers require the `jp.hadashikick.vcontainer` package.
+- Current package distribution includes VContainer integration in runtime assembly, so `jp.hadashikick.vcontainer` is required.
 
 ## Runtime API
 - `IVfxService`
@@ -23,6 +23,55 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - `TryUpdate(VfxHandle handle, in VfxParams parameters)`
   - `GetStats()`
 - `VfxManager` static facade for non-DI usage.
+
+## High-Level Usage
+1. Author a `VfxCatalog` with ids and prefabs.
+2. Bootstrap one `IVfxService` (manual, static facade, or DI).
+3. Spawn effects from gameplay presentation with ids (not raw prefab references).
+4. Keep handles only for effects you need to update/stop.
+5. Use scoped stop filters (`Gameplay`, `Owner`, `Id`) instead of global stop by default.
+
+```csharp
+// one-shot
+var handle = vfxService.PlayAt(VFXRefs.Effects.VfxPrefab, worldPoint);
+
+// optional update
+vfxService.TryUpdate(handle, VfxParams.Empty.WithScale(1.2f));
+
+// explicit stop
+vfxService.Stop(handle);
+```
+
+## Targeting Preview Pattern
+Targeting line/arc visuals should be owned by your targeting system loop, not by core gameplay logic.
+
+```csharp
+// Begin aiming (spawn once)
+previewHandle = vfxService.PlayOn(
+    previewId, // e.g. Effects.LinePreview
+    casterGameObject,
+    AttachMode.FollowPositionOnly,
+    VfxParams.Empty.WithTargetPoint(initialAimPoint),
+    VfxPlayOptions.DefaultGameplay
+        .WithAutoRelease(false)
+        .WithOwner(casterGameObject));
+
+// During aiming (every frame)
+vfxService.TryUpdate(
+    previewHandle,
+    VfxParams.Empty.WithTargetPoint(currentAimPoint));
+
+// Confirm or cancel
+vfxService.Stop(previewHandle);
+previewHandle = VfxHandle.Invalid;
+```
+
+## Owner-Scoped Cleanup Example
+```csharp
+var stopped = vfxService.StopAll(
+    VfxStopFilter.GameplayDefault
+        .WithOwner(casterGameObject));
+```
 
 ## Layer 2 Runtime Behavior
 - `PlayOn(...)` supports:
@@ -69,6 +118,8 @@ using VContainer;
 public override void Configure(IContainerBuilder builder)
 {
     builder.RegisterVfx(
+        catalog: gameplayCatalog,
+        configuration: gameplayVfxConfig,
         poolManagerObjectName: "VFXSystem_PoolManager",
         dontDestroyOnLoad: true);
 }
