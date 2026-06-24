@@ -80,7 +80,7 @@ Before generating code for complex features, provide a brief plan:
 ---
 
 ## Build & Test
-- Open project with Unity Hub editor `6000.3.0f1` (see `ProjectSettings/ProjectVersion.txt`).
+- Open project with Unity Hub editor `6000.3.9f1` (see `ProjectSettings/ProjectVersion.txt`).
 - Build: Unity Editor -> `File -> Build Settings -> Build`.
 - Tests: Unity Test Runner (`Window -> General -> Test Runner`).
 - Add tests under:

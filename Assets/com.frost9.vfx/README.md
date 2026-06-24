@@ -2,6 +2,10 @@
 
 Reusable Unity VFX package with catalog-driven playback, pooled instances, and service-first APIs.
 
+## Requirements
+- Unity 6.3 (`6000.3`) or newer. Developed and tested on `6000.3.9f1`.
+- VContainer `1.17.0` (optional integration helpers are compiled only when VContainer is present).
+
 ## Runtime Surface
 - `IVfxService`:
   - `PlayAt(...)`
@@ -12,6 +16,7 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
   - `GetStats()`
 - `VfxManager`: static fallback facade.
 - Catalog-driven ids: `VfxId`, `VfxCatalog`, generated `VFXRefs`.
+- `VfxCatalog` read-only API (no `UnityEditor`): `Count`, `Ids`, `Contains(VfxId)`, `TryGetEntry(...)`, `Entries`.
 
 ## Generated Refs Output
 - Generate ids from catalogs: `Tools/Frost9/VFX/Generate VFXRefs`.
@@ -30,6 +35,54 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
 - `Auto Release By Default`: default release behavior for spawned instances.
 - `Fallback Lifetime Seconds`: safety auto-release timeout for runners that do not signal completion.
 - `Default Parameters`: typed parameter defaults merged with call-site overrides.
+
+## Editor Authoring APIs (`Frost9.VFX.Editor`)
+Reusable editor plumbing for building project-side authoring tools without reflection, mutating private serialized lists, parsing generated C#, or simulating menu clicks. Editor-only; the runtime assembly stays free of `UnityEditor`.
+
+```csharp
+using Frost9.VFX.Editor;
+
+// 1) Mutate a catalog (SerializedObject-based; Undo + dirty handled).
+//    Prefab-only updates preserve every tuned entry setting.
+VfxCatalogEditing.AddOrUpdate(catalog, new VfxId("Effects.Fireball"), fireballPrefab);
+VfxCatalogEditing.Remove(catalog, new VfxId("Effects.Old"));
+
+// Batch many edits, applied once on dispose:
+using (var batch = VfxCatalogEditing.BeginBatch(catalog))
+{
+    batch.AddOrUpdate(idA, prefabA);
+    batch.AddOrUpdate(idB, prefabB);
+}
+
+// Synchronize toward a desired set. Stale entries are reported, and only
+// removed when removeMissing is true. Conflicts/errors apply no changes.
+var sync = VfxCatalogEditing.Sync(
+    catalog,
+    desired: new[] { (idA, prefabA), (idB, prefabB) },
+    removeMissing: false);
+// sync.Added / Updated / Unchanged / Stale / Removed / Conflicts / Errors
+
+// 2) Discover ids across the project (or scoped to one catalog).
+var project = VfxCatalogDiscovery.DiscoverProject();   // project-known ids + provenance + conflicts
+var scoped  = VfxCatalogDiscovery.DiscoverCatalog(catalog);
+
+// 3) Validate programmatically (no dialogs/logging contract).
+var report    = VfxCatalogValidation.ValidateCatalog(catalog);
+var aggregate = VfxCatalogValidation.ValidateAllProjectCatalogs();
+
+// 4) Generate VFXRefs directly (returns Changed + structured conflicts/warnings).
+var gen = VfxRefsGenerator.GenerateFromProject();
+
+// 5) Share the exact generator sanitization / collision rules.
+var identifier = VfxIdentifierSanitizer.Sanitize("Fire Ball");   // "Fire_Ball"
+var analysis   = VfxIdentifierAnalysis.Analyze(rawIds);          // collision groups + generated names
+
+// 6) Ensure a prefab has a valid IVfxPlayable runner (idempotent).
+var ensure = VfxPrefabAuthoring.EnsurePlayable(prefabAsset);     // Changed / Unchanged / Error
+```
+
+- **Searchable `VfxId` drawer:** fields typed as `VfxId` render as a searchable dropdown of project-known ids (with explicit None, a manual-entry escape hatch, and warnings for missing/conflicting ids). The decision logic is exposed as the reusable `VfxIdDrawerModel`.
+- **Project-known vs runtime-valid:** `DiscoverProject` returns ids authored anywhere in the project, not ids guaranteed playable by a specific `IVfxService` (a service binds one catalog). Use `DiscoverCatalog` to scope to a registered catalog.
 
 ## Quick Start (Direct Service)
 ```csharp

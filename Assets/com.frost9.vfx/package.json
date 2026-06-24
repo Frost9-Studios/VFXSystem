@@ -1,9 +1,9 @@
 {
   "name": "com.frost9.vfx",
   "displayName": "Frost9 VFX System",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reusable visual effects system with catalog-driven playback, pooled runtime instances, and service-first APIs.",
-  "unity": "6000.0",
+  "unity": "6000.3",
   "unityRelease": "0f1",
   "keywords": [
     "vfx",
