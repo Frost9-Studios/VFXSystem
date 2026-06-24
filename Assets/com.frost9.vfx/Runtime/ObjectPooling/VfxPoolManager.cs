@@ -276,7 +276,12 @@ namespace Frost9.VFX
             {
                 var bucket = pair.Value;
                 var inactiveCount = bucket.Pool.CountInactive;
-                var createdCount = bucket.Pool.CountAll;
+
+                // Currently-existing instances = active + inactive-pooled. This is intentionally
+                // derived from manager/pool bookkeeping rather than ObjectPool.CountAll: CountAll is
+                // cumulative-since-clear and would over-report after an instance is retired outside
+                // the pool (a destroyed GameObject or runner), so this keeps Created == Active + Pooled.
+                var createdCount = bucket.ActiveInstances.Count + inactiveCount;
                 pooledInstances += inactiveCount;
                 totalCreated += createdCount;
                 totalRecycled += bucket.RecycleCount;
@@ -416,8 +421,20 @@ namespace Frost9.VFX
 
         private void OnReturnedToPool(PooledVfxInstance instance)
         {
-            instance.GameObject.transform.SetParent(poolRoot, false);
-            instance.GameObject.SetActive(false);
+            if (instance == null)
+            {
+                return;
+            }
+
+            // Defense-in-depth: only live instances reach Pool.Release now, but never touch a
+            // destroyed GameObject's transform/active state. Managed bookkeeping fields are still
+            // reset regardless so the pooled wrapper is left in a clean state.
+            if (instance.GameObject != null)
+            {
+                instance.GameObject.transform.SetParent(poolRoot, false);
+                instance.GameObject.SetActive(false);
+            }
+
             instance.Owner = null;
             instance.Channel = VfxChannel.Gameplay;
             instance.AutoRelease = true;
@@ -471,6 +488,21 @@ namespace Frost9.VFX
             if (instance == null || !instance.IsActive || instance.IsReleasing)
             {
                 return;
+            }
+
+            // A destroyed runner and a destroyed GameObject need different handling: a live
+            // GameObject whose IVfxPlayable was destroyed must still be retired AND have its
+            // now-unusable GameObject destroyed so it cannot leak outside the pool. Neither dead
+            // state may touch Unity state or be returned to the pool (that would later hand out a
+            // dead instance). Only fully live instances take the normal Stop/Release path.
+            switch (Classify(instance))
+            {
+                case InstanceLiveness.GameObjectDestroyed:
+                    RetireActiveInstance(instance, destroyGameObject: false);
+                    return;
+                case InstanceLiveness.RunnerDestroyed:
+                    RetireActiveInstance(instance, destroyGameObject: true);
+                    return;
             }
 
             instance.IsReleasing = true;
@@ -535,7 +567,10 @@ namespace Frost9.VFX
                     continue;
                 }
 
-                if (instance.GameObject == null || instance.Playable == null)
+                // Unity-aware detection: catches both a destroyed GameObject and a destroyed backing
+                // runner whose interface reference is still non-null (a plain managed null check
+                // would miss the latter).
+                if (Classify(instance) != InstanceLiveness.Live)
                 {
                     pendingDestroyedCleanup.Add(instance);
                     continue;
@@ -570,17 +605,70 @@ namespace Frost9.VFX
 
             for (var i = 0; i < pendingDestroyedCleanup.Count; i++)
             {
-                CleanupDestroyedActiveInstance(pendingDestroyedCleanup[i]);
+                var instance = pendingDestroyedCleanup[i];
+
+                // If the GameObject is still alive (only the runner died), retire it AND destroy the
+                // orphan GameObject; otherwise the GameObject is already gone.
+                var destroyGameObject = instance != null && instance.GameObject != null;
+                RetireActiveInstance(instance, destroyGameObject);
             }
         }
 
-        private void CleanupDestroyedActiveInstance(PooledVfxInstance instance)
+        /// <summary>
+        /// Liveness of a pooled instance's backing Unity objects.
+        /// </summary>
+        private enum InstanceLiveness
+        {
+            Live,
+            GameObjectDestroyed,
+            RunnerDestroyed
+        }
+
+        /// <summary>
+        /// Classifies an instance using Unity-aware destroyed-object checks.
+        /// </summary>
+        private static InstanceLiveness Classify(PooledVfxInstance instance)
+        {
+            // Unity overloads operator== so a destroyed GameObject compares equal to null.
+            if (instance.GameObject == null)
+            {
+                return InstanceLiveness.GameObjectDestroyed;
+            }
+
+            // Playable is held through an interface reference, so a plain managed null check cannot
+            // see a destroyed backing UnityEngine.Object. Check both the managed null and the
+            // Unity-aware destroyed state of the backing object.
+            if (instance.Playable == null)
+            {
+                return InstanceLiveness.RunnerDestroyed;
+            }
+
+            if (instance.Playable is UnityEngine.Object playableObject && playableObject == null)
+            {
+                return InstanceLiveness.RunnerDestroyed;
+            }
+
+            return InstanceLiveness.Live;
+        }
+
+        /// <summary>
+        /// Retires an active instance whose backing objects are unusable, performing the full
+        /// bookkeeping exactly once and optionally destroying an orphaned GameObject.
+        /// </summary>
+        /// <param name="instance">Instance to retire.</param>
+        /// <param name="destroyGameObject">
+        /// True when the GameObject is still alive but the instance can no longer be reused
+        /// (for example its runner was destroyed); the GameObject is destroyed to avoid a leak.
+        /// </param>
+        private void RetireActiveInstance(PooledVfxInstance instance, bool destroyGameObject)
         {
             if (instance == null || !instance.IsActive)
             {
                 return;
             }
 
+            // Flip IsActive first so any subsequent ReleaseInstance/Update/ClearAll pass over the
+            // same instance no-ops; this guarantees activeCount is decremented exactly once.
             instance.IsActive = false;
             instance.IsReleasing = false;
             instance.HasAutoReleaseDeadline = false;
@@ -601,6 +689,13 @@ namespace Frost9.VFX
             }
 
             instancesBySlot.Remove(instance.SlotIndex);
+
+            // The retired instance is never returned to the pool (that would later hand out a dead
+            // instance). Destroy the orphaned GameObject when it is still alive but unusable.
+            if (destroyGameObject && instance.GameObject != null)
+            {
+                Destroy(instance.GameObject);
+            }
         }
 
         private static AttachMode NormalizeAttachMode(AttachMode mode)

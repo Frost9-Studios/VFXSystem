@@ -15,26 +15,20 @@ namespace Frost9.VFX.Editor
         [MenuItem(ValidateAllMenuPath)]
         public static void ValidateAllCatalogs()
         {
-            var guids = AssetDatabase.FindAssets("t:VfxCatalog");
-            if (guids == null || guids.Length == 0)
+            var aggregate = VfxCatalogValidation.ValidateAllProjectCatalogs();
+            if (aggregate.CatalogCount == 0)
             {
                 UnityEngine.Debug.Log("[VfxCatalogValidator] No VfxCatalog assets found.");
                 return;
             }
 
-            var totalErrors = 0;
-            var totalWarnings = 0;
-            for (var i = 0; i < guids.Length; i++)
+            for (var i = 0; i < aggregate.Reports.Count; i++)
             {
-                var path = AssetDatabase.GUIDToAssetPath(guids[i]);
-                var catalog = AssetDatabase.LoadAssetAtPath<VfxCatalog>(path);
-                var result = VfxCatalogValidationLogging.ValidateAndLog(catalog, "Menu");
-                totalErrors += result.ErrorCount;
-                totalWarnings += result.WarningCount;
+                var report = aggregate.Reports[i];
+                VfxCatalogValidationLogging.LogResult(report.Catalog, report.Result, "Menu");
             }
 
-            UnityEngine.Debug.Log(
-                $"[VfxCatalogValidator][Menu] Completed. Catalogs={guids.Length}, Errors={totalErrors}, Warnings={totalWarnings}.");
+            UnityEngine.Debug.Log($"[VfxCatalogValidator][Menu] Completed. {aggregate.Summary}");
         }
     }
 }

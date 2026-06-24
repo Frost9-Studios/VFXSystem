@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
-using UnityEngine;
 
 namespace Frost9.VFX.Editor
 {
@@ -16,17 +15,6 @@ namespace Frost9.VFX.Editor
         /// </summary>
         public const string DefaultOutputPath = "Assets/Resources/VFX/VFXRefs.cs";
 
-        private static readonly HashSet<string> CSharpKeywords = new HashSet<string>(System.StringComparer.Ordinal)
-        {
-            "abstract","as","base","bool","break","byte","case","catch","char","checked","class","const","continue",
-            "decimal","default","delegate","do","double","else","enum","event","explicit","extern","false","finally",
-            "fixed","float","for","foreach","goto","if","implicit","in","int","interface","internal","is","lock",
-            "long","namespace","new","null","object","operator","out","override","params","private","protected",
-            "public","readonly","ref","return","sbyte","sealed","short","sizeof","stackalloc","static","string",
-            "struct","switch","this","throw","true","try","typeof","uint","ulong","unchecked","unsafe","ushort",
-            "using","virtual","void","volatile","while"
-        };
-
         /// <summary>
         /// Generates refs from all catalog assets and writes the runtime generated file.
         /// </summary>
@@ -34,7 +22,7 @@ namespace Frost9.VFX.Editor
         /// <returns>Generation operation result.</returns>
         public static VfxRefsGenerationResult GenerateFromProject(string outputPath = DefaultOutputPath)
         {
-            var ids = new SortedSet<string>(System.StringComparer.Ordinal);
+            var rawIds = new List<string>();
             var guids = AssetDatabase.FindAssets("t:VfxCatalog");
 
             for (var i = 0; i < guids.Length; i++)
@@ -55,20 +43,25 @@ namespace Frost9.VFX.Editor
                         continue;
                     }
 
-                    ids.Add(entry.Id.Value);
+                    rawIds.Add(entry.Id.Value);
                 }
             }
 
-            if (ids.Count == 0 && File.Exists(outputPath))
+            var analysis = VfxIdentifierAnalysis.Analyze(rawIds);
+            var idCount = analysis.Identifiers.Count;
+            var warnings = BuildWarnings(rawIds, analysis);
+            var conflicts = analysis.CollisionGroups;
+
+            if (idCount == 0 && File.Exists(outputPath))
             {
-                return new VfxRefsGenerationResult(guids.Length, 0, outputPath, false);
+                return new VfxRefsGenerationResult(guids.Length, 0, outputPath, false, warnings, conflicts);
             }
 
-            var source = GenerateSource(ids);
+            var source = GenerateSource(analysis);
             var changed = WriteIfChanged(outputPath, source);
             AssetDatabase.ImportAsset(outputPath, ImportAssetOptions.ForceUpdate);
 
-            return new VfxRefsGenerationResult(guids.Length, ids.Count, outputPath, changed);
+            return new VfxRefsGenerationResult(guids.Length, idCount, outputPath, changed, warnings, conflicts);
         }
 
         /// <summary>
@@ -78,24 +71,11 @@ namespace Frost9.VFX.Editor
         /// <returns>Generated C# source text.</returns>
         public static string GenerateSource(IEnumerable<string> ids)
         {
-            var sorted = new SortedSet<string>(System.StringComparer.Ordinal);
-            if (ids != null)
-            {
-                foreach (var id in ids)
-                {
-                    if (!string.IsNullOrWhiteSpace(id))
-                    {
-                        sorted.Add(id.Trim());
-                    }
-                }
-            }
+            return GenerateSource(VfxIdentifierAnalysis.Analyze(ids));
+        }
 
-            var root = new Node(string.Empty);
-            foreach (var id in sorted)
-            {
-                AddId(root, id);
-            }
-
+        private static string GenerateSource(VfxIdentifierAnalysis analysis)
+        {
             var builder = new StringBuilder(4096);
             builder.AppendLine("namespace Frost9.VFX");
             builder.AppendLine("{");
@@ -104,56 +84,13 @@ namespace Frost9.VFX.Editor
             builder.AppendLine("    /// </summary>");
             builder.AppendLine("    public static class VFXRefs");
             builder.AppendLine("    {");
-            EmitNodeChildren(builder, root, 2);
+            EmitNodeChildren(builder, analysis.Root, 2);
             builder.AppendLine("    }");
             builder.AppendLine("}");
             return builder.ToString();
         }
 
-        private static void AddId(Node root, string id)
-        {
-            var rawSegments = id.Split('.');
-            var segments = new List<string>(rawSegments.Length);
-            for (var i = 0; i < rawSegments.Length; i++)
-            {
-                var segment = rawSegments[i].Trim();
-                if (!string.IsNullOrWhiteSpace(segment))
-                {
-                    segments.Add(segment);
-                }
-            }
-
-            if (segments.Count == 0)
-            {
-                return;
-            }
-
-            var current = root;
-            for (var i = 0; i < segments.Count - 1; i++)
-            {
-                var rawSegment = segments[i];
-                string className;
-                if (!current.RawSegmentToChildName.TryGetValue(rawSegment, out className))
-                {
-                    className = AllocateUniqueIdentifier(current.ChildClassCounters, SanitizeIdentifier(rawSegment, fallback: "Group"));
-                    current.RawSegmentToChildName.Add(rawSegment, className);
-                }
-
-                if (!current.ChildrenByName.TryGetValue(className, out var child))
-                {
-                    child = new Node(className);
-                    current.ChildrenByName.Add(className, child);
-                    current.Children.Add(child);
-                }
-
-                current = child;
-            }
-
-            var fieldName = AllocateUniqueIdentifier(current.FieldCounters, SanitizeIdentifier(segments[segments.Count - 1], fallback: "Id"));
-            current.Fields.Add(new Field(fieldName, id));
-        }
-
-        private static void EmitNodeChildren(StringBuilder builder, Node node, int indentLevel)
+        private static void EmitNodeChildren(StringBuilder builder, VfxIdentifierTrieNode node, int indentLevel)
         {
             var indent = new string(' ', indentLevel * 4);
 
@@ -183,85 +120,54 @@ namespace Frost9.VFX.Editor
             }
         }
 
-        private static string SanitizeIdentifier(string rawValue, string fallback)
+        private static List<string> BuildWarnings(List<string> rawIds, VfxIdentifierAnalysis analysis)
         {
-            if (string.IsNullOrWhiteSpace(rawValue))
+            var warnings = new List<string>();
+
+            var counts = new Dictionary<string, int>(System.StringComparer.Ordinal);
+            for (var i = 0; i < rawIds.Count; i++)
             {
-                return fallback;
+                var raw = rawIds[i];
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    continue;
+                }
+
+                var trimmed = raw.Trim();
+                counts.TryGetValue(trimmed, out var count);
+                counts[trimmed] = count + 1;
             }
 
-            var builder = new StringBuilder(rawValue.Length + 4);
-            for (var i = 0; i < rawValue.Length; i++)
+            var duplicateKeys = new List<string>();
+            foreach (var pair in counts)
             {
-                var character = rawValue[i];
-                var isLetter = char.IsLetter(character);
-                var isDigit = char.IsDigit(character);
-                var isUnderscore = character == '_';
-
-                if (i == 0)
+                if (pair.Value > 1)
                 {
-                    if (isLetter || isUnderscore)
-                    {
-                        builder.Append(character);
-                    }
-                    else if (isDigit)
-                    {
-                        builder.Append('_').Append(character);
-                    }
-                    else
-                    {
-                        builder.Append('_');
-                    }
-                }
-                else
-                {
-                    builder.Append(isLetter || isDigit || isUnderscore ? character : '_');
+                    duplicateKeys.Add(pair.Key);
                 }
             }
 
-            var value = builder.ToString();
-            if (string.IsNullOrWhiteSpace(value) || IsAllUnderscores(value))
+            duplicateKeys.Sort(System.StringComparer.Ordinal);
+            for (var i = 0; i < duplicateKeys.Count; i++)
             {
-                value = fallback;
+                var key = duplicateKeys[i];
+                warnings.Add(
+                    $"Duplicate raw id '{key}' found in {counts[key]} catalog entries; only one is emitted.");
             }
 
-            if (CSharpKeywords.Contains(value))
+            for (var i = 0; i < analysis.CollisionGroups.Count; i++)
             {
-                value = "_" + value;
+                var group = analysis.CollisionGroups[i];
+                warnings.Add(
+                    $"Ids [{string.Join(", ", group)}] sanitize to the same identifier and were disambiguated with numeric suffixes.");
             }
 
-            return value;
-        }
-
-        private static string AllocateUniqueIdentifier(Dictionary<string, int> counters, string sanitized)
-        {
-            if (!counters.TryGetValue(sanitized, out var count))
-            {
-                counters[sanitized] = 1;
-                return sanitized;
-            }
-
-            var next = count + 1;
-            counters[sanitized] = next;
-            return sanitized + "_" + next.ToString();
+            return warnings;
         }
 
         private static string EscapeString(string value)
         {
             return value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-        }
-
-        private static bool IsAllUnderscores(string value)
-        {
-            for (var i = 0; i < value.Length; i++)
-            {
-                if (value[i] != '_')
-                {
-                    return false;
-                }
-            }
-
-            return value.Length > 0;
         }
 
         private static bool WriteIfChanged(string outputPath, string content)
@@ -292,41 +198,6 @@ namespace Frost9.VFX.Editor
             }
 
             return true;
-        }
-
-        private sealed class Node
-        {
-            public Node(string name)
-            {
-                Name = name;
-            }
-
-            public string Name { get; }
-
-            public List<Node> Children { get; } = new List<Node>();
-
-            public Dictionary<string, Node> ChildrenByName { get; } = new Dictionary<string, Node>(System.StringComparer.Ordinal);
-
-            public List<Field> Fields { get; } = new List<Field>();
-
-            public Dictionary<string, int> ChildClassCounters { get; } = new Dictionary<string, int>(System.StringComparer.Ordinal);
-
-            public Dictionary<string, string> RawSegmentToChildName { get; } = new Dictionary<string, string>(System.StringComparer.Ordinal);
-
-            public Dictionary<string, int> FieldCounters { get; } = new Dictionary<string, int>(System.StringComparer.Ordinal);
-        }
-
-        private readonly struct Field
-        {
-            public Field(string name, string value)
-            {
-                Name = name;
-                Value = value;
-            }
-
-            public string Name { get; }
-
-            public string Value { get; }
         }
     }
 }

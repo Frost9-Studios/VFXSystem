@@ -23,6 +23,52 @@ namespace Frost9.VFX
         public IReadOnlyList<VfxCatalogEntry> Entries => entries;
 
         /// <summary>
+        /// Gets the number of catalog entries (including any invalid or duplicate slots).
+        /// </summary>
+        public int Count => entries.Count;
+
+        /// <summary>
+        /// Enumerates the distinct, valid ids resolvable from this catalog.
+        /// </summary>
+        public IEnumerable<VfxId> Ids
+        {
+            get
+            {
+                BuildLookup();
+                foreach (var pair in lookup)
+                {
+                    yield return pair.Key;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Tests whether a valid entry exists for an id.
+        /// </summary>
+        /// <param name="id">Identifier to test.</param>
+        /// <returns>True when a resolvable entry exists.</returns>
+        public bool Contains(VfxId id)
+        {
+            BuildLookup();
+            return lookup.ContainsKey(id);
+        }
+
+        /// <summary>
+        /// Invalidates the cached id lookup so it is rebuilt lazily on next access.
+        /// </summary>
+        /// <remarks>
+        /// Editor tooling that mutates the serialized entries collection (for example through a
+        /// <c>SerializedObject</c>) should call this after applying changes so runtime lookups
+        /// (<see cref="Contains"/>, <see cref="TryGetEntry"/>, <see cref="Ids"/>) stay coherent
+        /// without requiring an asset reimport or domain reload. The lookup is instance state
+        /// rebuilt from the serialized entries, so it is unaffected by Enter Play Mode Options.
+        /// </remarks>
+        public void InvalidateLookup()
+        {
+            lookupBuilt = false;
+        }
+
+        /// <summary>
         /// Sets entries for runtime bootstrap or tests.
         /// </summary>
         /// <param name="newEntries">Entries to assign.</param>

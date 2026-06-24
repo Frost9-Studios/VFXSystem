@@ -17,13 +17,30 @@ namespace Frost9.VFX.Editor
         public static VfxCatalogValidationResult ValidateAndLog(VfxCatalog catalog, string source)
         {
             var result = VfxCatalogValidator.Validate(catalog);
+            LogResult(catalog, result, source);
+            return result;
+        }
+
+        /// <summary>
+        /// Writes an already-computed validation result to the console.
+        /// </summary>
+        /// <param name="catalog">Validated catalog.</param>
+        /// <param name="result">Validation result to log.</param>
+        /// <param name="source">Validation trigger source label.</param>
+        public static void LogResult(VfxCatalog catalog, VfxCatalogValidationResult result, string source)
+        {
+            if (result == null)
+            {
+                return;
+            }
+
             var path = catalog != null ? AssetDatabase.GetAssetPath(catalog) : "<null>";
             var sourceLabel = string.IsNullOrWhiteSpace(source) ? "Manual" : source;
 
             if (result.Issues.Count == 0)
             {
                 Debug.Log($"[VfxCatalogValidator][{sourceLabel}] Valid catalog: {path}", catalog);
-                return result;
+                return;
             }
 
             for (var i = 0; i < result.Issues.Count; i++)
@@ -51,8 +68,6 @@ namespace Frost9.VFX.Editor
             Debug.Log(
                 $"[VfxCatalogValidator][{sourceLabel}] {path} -> Errors={result.ErrorCount}, Warnings={result.WarningCount}",
                 catalog);
-
-            return result;
         }
     }
 }
