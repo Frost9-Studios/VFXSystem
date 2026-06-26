@@ -19,7 +19,7 @@ Reusable Unity VFX package with catalog-driven playback, pooled instances, and s
 - `VfxCatalog` read-only API (no `UnityEditor`): `Count`, `Ids`, `Contains(VfxId)`, `TryGetEntry(...)`, `Entries`.
 
 ## Generated Refs Output
-- Generate ids from catalogs: `Tools/Frost9/VFX/Generate VFXRefs`.
+- Generate ids from catalogs via the editor API `VfxRefsGenerator.GenerateFromProject()` — consumers typically invoke this through their **Sync VFX** command; the `VfxCatalog` inspector also exposes a **Generate VFXRefs** button.
 - Catalog scan scope: all project assets matching `t:VfxCatalog`.
 - Output path is fixed: `Assets/Resources/VFX/VFXRefs.cs`.
 - Output folders are created automatically if missing.

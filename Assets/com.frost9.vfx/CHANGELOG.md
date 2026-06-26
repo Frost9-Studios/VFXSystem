@@ -2,6 +2,10 @@
 
 All notable changes to this package are documented in this file.
 
+## [Unreleased]
+### Removed
+- Editor menu items `Tools/Frost9/VFX/Generate VFXRefs` and `Tools/Frost9/VFX/Validate All Catalogs`. Both were thin menu-only wrappers: refs generation runs through the consumer's **Sync VFX** command and the `VfxCatalog` inspector **Generate VFXRefs** button, and catalog validation runs automatically on import (`VfxCatalogValidationAutoRunner`) plus via the inspector — all using the retained `VfxRefsGenerator.GenerateFromProject` / `VfxCatalogValidation.ValidateAllProjectCatalogs` APIs (signatures unchanged). `Tools/Frost9/VFX` now contains only **Diagnostics**.
+
 ## [0.2.0] - 2026-06-24
 ### Added
 - Read-only catalog API on `VfxCatalog`: `Count`, `Ids`, `Contains(VfxId)`, plus an `InvalidateLookup()` coherence seam (all `UnityEditor`-free).

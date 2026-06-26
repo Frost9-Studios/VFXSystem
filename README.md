@@ -94,10 +94,10 @@ var stopped = vfxService.StopAll(
 ## Editor Tooling
 - Catalog validation:
   - inspector button on `VfxCatalog` assets
-  - menu item: `Tools/Frost9/VFX/Validate All Catalogs`
   - throttled auto-validation on catalog asset changes
+  - programmatic API: `VfxCatalogValidation.ValidateAllProjectCatalogs()` (used by the consumer's Sync VFX)
 - Deterministic refs generation:
-  - menu item: `Tools/Frost9/VFX/Generate VFXRefs`
+  - programmatic API: `VfxRefsGenerator.GenerateFromProject()` (used by the consumer's Sync VFX; the `VfxCatalog` inspector also exposes a **Generate VFXRefs** button)
   - scans all project `VfxCatalog` assets via `AssetDatabase.FindAssets("t:VfxCatalog")`
   - fixed output path: `Assets/Resources/VFX/VFXRefs.cs`
   - output folder is auto-created when missing
@@ -156,7 +156,7 @@ public override void Configure(IContainerBuilder builder)
 - Layer 3A complete: editor validation foundation.
 - Layer 3A includes:
   - `VfxCatalogValidator` with structured error/warning output
-  - manual validation via catalog inspector button and `Tools/Frost9/VFX/Validate All Catalogs`
+  - manual validation via catalog inspector button and the `VfxCatalogValidation.ValidateAllProjectCatalogs()` API
   - throttled automatic validation on catalog asset changes
   - validation coverage for duplicate ids, missing prefabs, missing `IVfxPlayable`, and pool/lifetime config sanity
   - editor tests for valid and deliberately broken catalog cases
