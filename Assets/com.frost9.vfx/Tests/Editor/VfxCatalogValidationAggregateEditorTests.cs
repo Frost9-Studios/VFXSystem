@@ -33,7 +33,7 @@ namespace Frost9.VFX.Tests
 
         /// <summary>
         /// Verifies the aggregate reports each catalog with provenance and a result matching the
-        /// direct single-catalog validator (the menu wrapper logs these same results).
+        /// direct single-catalog validator (the inspector and auto-runner log these same results).
         /// </summary>
         [Test]
         public void ValidateAllProjectCatalogs_ReturnsPerCatalogProvenance_MatchingDirectValidate()
